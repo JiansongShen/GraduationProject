@@ -1,0 +1,23 @@
+[project]
+name = "gradulate"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "torchvision",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "nibabel>=5.0",
+    "numpy>=1.24",
+    "plotly>=5.20",
+    "pyyaml>=6.0",
+    "matplotlib",
+    "tqdm",
+    "pillow",
+    "tensorboard",
+    "scipy>=1.15.3",
+    "ipykernel>=7.2.0",
+    "pandas>=2.3.3",
+    "simpleitk"
+]

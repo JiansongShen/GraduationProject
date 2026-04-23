@@ -1,0 +1,63 @@
+model:
+  name: "unet"
+  in_channels: 1
+  out_channels: 1
+  base_filters: 32
+  depth: 4
+
+train:
+  epochs: 50
+  batch_size: 1
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  patch_size: [128, 128, 128]
+  max_patches_per_volume: null
+  optimizer: "adam"
+  scheduler: "cosine"
+  warmup_epochs: 5
+
+data:
+  train_dirs:
+    - "/home/jiansongshen/Desktop/ml_dataset/IA/SingleCrop"
+    - "/home/jiansongshen/Desktop/ml_dataset/IA/MultiCrop"
+  eval_dirs:
+    - "/home/jiansongshen/Desktop/ml_dataset/IA/Single"
+    - "/home/jiansongshen/Desktop/ml_dataset/IA/Multi"
+  num_workers: 2
+  prefetch_factor: 2
+  file_patterns:
+    - "*_origin.nii.gz"
+    - "*_brainpre.nii.gz"
+  label_suffix: "_label.nii.gz"
+  train_ratio: 0.8
+
+async_load:
+  ram_cache_gb: 8.0
+  vram_batch_gb: 2.0
+  auto_config: true
+
+compile:
+  enabled: false
+  mode: "default"
+  fullgraph: false
+
+checkpoint:
+  save_dir: "checkpoints"
+  save_best: true
+  save_interval: 10
+  max_keep: 3
+
+risk:
+  excel_path: "dataset/data.xlsx"
+  label_column: "破裂"
+  id_column: "7lesion_id"
+  feature_columns: []
+  artifact_path: "checkpoints/risk_model.joblib"
+  classifier: "hist_gradient_boosting"
+  test_size: 0.2
+  auto_max_features: 200
+
+device: "cpu"
+seed: 42
+log_dir: "logs"
+eval_interval: 5
