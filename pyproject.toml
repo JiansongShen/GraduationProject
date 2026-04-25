@@ -19,5 +19,7 @@ dependencies = [
     "scipy>=1.15.3",
     "ipykernel>=7.2.0",
     "pandas>=2.3.3",
-    "simpleitk"
+    "simpleitk",
+    "scikit-learn>=1.7.2",
+    "openpyxl>=3.1.5",
 ]

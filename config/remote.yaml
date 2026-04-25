@@ -65,6 +65,33 @@ checkpoint:
   save_interval: 20
   max_keep: 5
 
+risk:
+  enabled: false
+  excel_path: "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
+  label_column: "破裂"
+  id_column: "7lesion_id"
+  feature_columns: []
+  task_type: "binary"
+  save_dir: "checkpoints/risk"
+  use_cleaned_data: true
+  use_dummy_metadata: false
+  dummy_num_rows: 512
+  metadata_columns: ["年龄", "性别", "部位"]
+  num_heads: 4
+  hidden_dim: 64
+  num_layers: 2
+  dropout: 0.1
+  epochs: 50
+  batch_size: 64
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
+  test_size: 0.2
+  val_size: 0.1
+  random_state: 42
+  auto_max_features: 64
+  feature_select_method: "mutual_info"
+  categorical_min_frequency: 5
+
 device: "cuda"
 seed: 42
 log_dir: "logs"

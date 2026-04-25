@@ -76,16 +76,33 @@ class CheckpointConfig:
 
 @dataclass
 class RiskConfig:
-    """动脉瘤破裂/高风险二分类（表格 + 可选形态特征）"""
+    """风险预测任务配置（结构化表格二分类）"""
 
-    excel_path: str = "dataset/data.xlsx"
+    enabled: bool = False
+    excel_path: str = "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
     label_column: str = "破裂"
     id_column: str = "7lesion_id"
     feature_columns: list[str] = field(default_factory=list)
-    artifact_path: str = "checkpoints/risk_model.joblib"
-    classifier: str = "hist_gradient_boosting"
+    task_type: str = "binary"
+    save_dir: str = "checkpoints/risk"
+    use_cleaned_data: bool = True
+    use_dummy_metadata: bool = False
+    dummy_num_rows: int = 512
+    metadata_columns: list[str] = field(default_factory=lambda: ["年龄", "性别", "部位"])
+    num_heads: int = 4
+    hidden_dim: int = 64
+    num_layers: int = 2
+    dropout: float = 0.1
+    epochs: int = 50
+    batch_size: int = 64
+    learning_rate: float = 1e-3
+    weight_decay: float = 1e-4
     test_size: float = 0.2
-    auto_max_features: int | None = 200
+    val_size: float = 0.1
+    random_state: int = 42
+    auto_max_features: int = 64
+    feature_select_method: str = "mutual_info"
+    categorical_min_frequency: int = 5
 
 
 @dataclass

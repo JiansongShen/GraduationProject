@@ -1,0 +1,16 @@
+{
+  "best_val_f1": 0.6214634093569638,
+  "test_loss": 0.4882139414548874,
+  "test_acc": 0.8671875,
+  "test_f1": 0.895199755673413,
+  "selected_numeric_columns": [
+    "年龄",
+    "直径_mm",
+    "是否不规则",
+    "是否吸烟"
+  ],
+  "selected_categorical_columns": [
+    "性别",
+    "部位"
+  ]
+}

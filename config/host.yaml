@@ -18,11 +18,11 @@ train:
 
 data:
   train_dirs:
-    - "/home/jiansongshen/Desktop/ml_dataset/IA/SingleCrop"
-    - "/home/jiansongshen/Desktop/ml_dataset/IA/MultiCrop"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/MultiCrop"
   eval_dirs:
-    - "/home/jiansongshen/Desktop/ml_dataset/IA/Single"
-    - "/home/jiansongshen/Desktop/ml_dataset/IA/Multi"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/Single"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/Multi"
   num_workers: 2
   prefetch_factor: 2
   file_patterns:
@@ -48,14 +48,31 @@ checkpoint:
   max_keep: 3
 
 risk:
-  excel_path: "dataset/data.xlsx"
+  enabled: false
+  excel_path: "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
   label_column: "破裂"
   id_column: "7lesion_id"
   feature_columns: []
-  artifact_path: "checkpoints/risk_model.joblib"
-  classifier: "hist_gradient_boosting"
+  task_type: "binary"
+  save_dir: "checkpoints/risk"
+  use_cleaned_data: true
+  use_dummy_metadata: false
+  dummy_num_rows: 512
+  metadata_columns: ["年龄", "性别", "部位"]
+  num_heads: 4
+  hidden_dim: 64
+  num_layers: 2
+  dropout: 0.1
+  epochs: 50
+  batch_size: 64
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
   test_size: 0.2
-  auto_max_features: 200
+  val_size: 0.1
+  random_state: 42
+  auto_max_features: 64
+  feature_select_method: "mutual_info"
+  categorical_min_frequency: 5
 
 device: "cpu"
 seed: 42

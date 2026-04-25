@@ -1,0 +1,80 @@
+2026-04-24 12:50:30,626 - INFO - Configuration loaded from: config/host.yaml
+2026-04-24 12:50:30,626 - INFO - Model: unet
+2026-04-24 12:50:30,626 - INFO - Device: cpu
+2026-04-24 12:50:30,626 - INFO - Using device: cpu
+2026-04-24 12:50:30,626 - INFO - Building model...
+2026-04-24 12:51:48,037 - INFO - Configuration loaded from: config/host.yaml
+2026-04-24 12:51:48,037 - INFO - Model: unet
+2026-04-24 12:51:48,037 - INFO - Device: cpu
+2026-04-24 12:51:48,037 - INFO - Using device: cpu
+2026-04-24 12:51:48,037 - INFO - Building model...
+2026-04-24 17:31:44,937 - INFO - Configuration loaded from: config/host.yaml
+2026-04-24 17:31:44,937 - INFO - Model: unet
+2026-04-24 17:31:44,937 - INFO - Device: cpu
+2026-04-24 17:31:44,937 - INFO - Using device: cpu
+2026-04-24 17:31:44,937 - INFO - Building model...
+2026-04-24 17:31:44,953 - INFO - Model parameters: 5,734
+2026-04-24 17:31:46,898 - INFO - Setting up datasets...
+2026-04-24 19:52:57,874 - INFO - Configuration loaded from: config/host.yaml
+2026-04-24 19:52:57,874 - INFO - Model: unet
+2026-04-24 19:52:57,874 - INFO - Device: cpu
+2026-04-24 19:52:57,874 - INFO - Using device: cpu
+2026-04-24 19:52:57,874 - INFO - Building model...
+2026-04-24 19:52:57,887 - INFO - Model parameters: 5,734
+2026-04-24 19:52:58,597 - INFO - Setting up datasets...
+2026-04-24 19:53:43,432 - INFO - Configuration loaded from: config/host.yaml
+2026-04-24 19:53:43,433 - INFO - Model: unet
+2026-04-24 19:53:43,433 - INFO - Device: cpu
+2026-04-24 19:53:43,433 - INFO - Using device: cpu
+2026-04-24 19:53:43,433 - INFO - Building model...
+2026-04-24 19:53:43,436 - INFO - Model parameters: 5,734
+2026-04-24 19:53:43,876 - INFO - Setting up datasets...
+2026-04-24 19:53:43,911 - INFO - Training samples: 649
+2026-04-24 19:53:43,911 - INFO - Validation samples: 649
+2026-04-24 19:53:43,911 - INFO - Starting training...
+2026-04-25 00:58:51,723 - INFO - Configuration loaded from: config/host.yaml
+2026-04-25 00:58:51,724 - INFO - Model: unet
+2026-04-25 00:58:51,724 - INFO - Device: cpu
+2026-04-25 00:58:51,724 - INFO - Using device: cpu
+2026-04-25 00:58:51,724 - INFO - Building model...
+2026-04-25 00:58:51,730 - INFO - Model parameters: 5,734
+2026-04-25 00:58:52,409 - INFO - Setting up datasets...
+2026-04-25 00:58:52,438 - INFO - Training samples: 649
+2026-04-25 00:58:52,438 - INFO - Validation samples: 649
+2026-04-25 00:58:52,439 - INFO - Starting training...
+2026-04-25 00:59:16,842 - INFO - Configuration loaded from: config/host.yaml
+2026-04-25 00:59:16,842 - INFO - Model: unet
+2026-04-25 00:59:16,842 - INFO - Device: cpu
+2026-04-25 00:59:16,842 - INFO - Using device: cpu
+2026-04-25 00:59:16,842 - INFO - Building model...
+2026-04-25 00:59:16,846 - INFO - Model parameters: 5,734
+2026-04-25 00:59:17,454 - INFO - Setting up datasets...
+2026-04-25 00:59:17,485 - INFO - Training samples: 649
+2026-04-25 00:59:17,485 - INFO - Validation samples: 649
+2026-04-25 00:59:17,486 - INFO - Starting training...
+2026-04-25 02:24:58,390 - INFO - Validation - Loss: 1.3451, Dice: 0.0447
+2026-04-25 02:24:58,513 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 02:24:58,518 - INFO - Saved best checkpoint to checkpoints/best.pth (Dice: 0.0447)
+2026-04-25 03:39:11,761 - INFO - Validation - Loss: 1.1970, Dice: 0.0447
+2026-04-25 03:39:11,787 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 03:39:11,793 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 04:53:17,954 - INFO - Validation - Loss: 1.1282, Dice: 0.0447
+2026-04-25 04:53:17,961 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 06:07:11,141 - INFO - Validation - Loss: 1.0904, Dice: 0.0447
+2026-04-25 06:07:11,148 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 06:07:11,154 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 07:21:10,192 - INFO - Validation - Loss: 1.0671, Dice: 0.0447
+2026-04-25 07:21:10,203 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 08:34:55,413 - INFO - Validation - Loss: 1.0476, Dice: 0.0447
+2026-04-25 08:34:55,420 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 08:34:55,427 - INFO - Saved latest checkpoint to checkpoints/latest.pth
+2026-04-25 10:18:04,042 - INFO - Configuration loaded from: config/host.yaml
+2026-04-25 10:18:04,042 - INFO - Model: unet
+2026-04-25 10:18:04,043 - INFO - Device: cpu
+2026-04-25 10:18:04,043 - INFO - Using device: cpu
+2026-04-25 10:18:04,043 - INFO - Building model...
+2026-04-25 10:18:04,049 - INFO - Model parameters: 5,734
+2026-04-25 10:18:04,702 - INFO - Setting up datasets...
+2026-04-25 10:18:04,736 - INFO - Training samples: 649
+2026-04-25 10:18:04,736 - INFO - Validation samples: 649
+2026-04-25 10:18:04,737 - INFO - Starting training...
