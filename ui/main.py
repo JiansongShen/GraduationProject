@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from core.config import Config, RiskConfig
 from core.config_loader import load_config
 from data.risk_tabular import build_risk_data_bundle
+from data.morphology_features import extract_morphology_features
 from model.risk.RiskCrossAttentionModel import RiskCrossAttentionModel
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -135,6 +136,8 @@ async def predict_risk(
 
     cta_path = _save_upload(cta_file)
     ref_path = _save_upload(reference_file) if reference_file else None
+    
+    # Build metadata from frontend inputs
     metadata = json.loads(extra_metadata or "{}")
     if age:
         metadata["年龄"] = age
@@ -143,8 +146,22 @@ async def predict_risk(
     if ref_path:
         metadata["参考分割文件"] = ref_path.name
 
-    features = _extract_radiomics_features(cta_path, ref_path, config.risk)
-    feature_row = {**metadata, **features}
+    # Extract morphology features from segmentation mask
+    morphology_features = {}
+    if ref_path:
+        try:
+            morphology_features = extract_morphology_features(
+                image_path=str(cta_path),
+                mask_path=str(ref_path),
+            )
+            logger.info("Extracted %d morphology features", len(morphology_features))
+        except Exception as e:
+            logger.warning("Failed to extract morphology features: %s", str(e))
+            morphology_features = {}
+    
+    # Combine all features: metadata + morphology + radiomics
+    radiomics_features = _extract_radiomics_features(cta_path, ref_path, config.risk)
+    feature_row = {**metadata, **morphology_features, **radiomics_features}
 
     bundle = build_risk_data_bundle(config.risk)
     model = RiskCrossAttentionModel(
@@ -167,7 +184,11 @@ async def predict_risk(
         {
             "ok": True,
             "risk_probability": prob,
-            "features": features,
+            "features": {
+                "morphology": morphology_features,
+                "radiomics": radiomics_features,
+                "metadata": metadata,
+            },
             "cta_path": cta_path.name,
             "reference_path": ref_path.name if ref_path else None,
         }

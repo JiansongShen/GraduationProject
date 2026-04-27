@@ -1,7 +1,7 @@
 [project]
 name = "gradulate"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "torch>=2.0",
     "torchvision",
@@ -24,4 +24,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pyradiomics-cuda",
     "python-jose[cryptography]",
+    "fastrad>=1.0.0",
+    "pip>=26.1",
+    "radiomics>=0.1",
 ]
