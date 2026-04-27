@@ -11,7 +11,7 @@ train:
   learning_rate: 1.0e-4
   weight_decay: 1.0e-5
   patch_size: [128, 128, 128]
-  max_patches_per_volume: null
+  max_patches_per_volume: 64
   optimizer: "adam"
   scheduler: "cosine"
   warmup_epochs: 5
@@ -73,8 +73,12 @@ risk:
   auto_max_features: 64
   feature_select_method: "mutual_info"
   categorical_min_frequency: 5
+  radiomics_backend: "pyradiomics-cuda"
+  cta_viewer_mode: "tri-planar"
+  segmentation_endpoint: "/api/cta/segment"
+  risk_endpoint: "/api/risk/predict"
 
-device: "cpu"
+device: "cuda"
 seed: 42
 log_dir: "logs"
 eval_interval: 5

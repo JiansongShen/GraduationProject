@@ -22,4 +22,6 @@ dependencies = [
     "simpleitk",
     "scikit-learn>=1.7.2",
     "openpyxl>=3.1.5",
+    "pyradiomics-cuda",
+    "python-jose[cryptography]",
 ]

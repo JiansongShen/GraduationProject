@@ -149,7 +149,6 @@ def _select_top_numeric_features(
     ranked = sorted(zip(x_num.columns, scores), key=lambda item: item[1], reverse=True)
     return [name for name, _ in ranked[: cfg.auto_max_features]]
 
-
 def build_risk_data_bundle(cfg: RiskConfig) -> RiskDataBundle:
     """Load, preprocess, split and select columns for risk task."""
     raw_df = _load_dataframe(cfg)

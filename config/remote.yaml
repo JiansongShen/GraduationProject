@@ -48,6 +48,7 @@ data:
     - "*_brainpre.nii.gz"
   label_suffix: "_label.nii.gz"
   train_ratio: 0.8
+  patches_per_volume: 64
 
 async_load:
   ram_cache_gb: 30.0

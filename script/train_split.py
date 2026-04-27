@@ -7,11 +7,11 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+import numpy as np
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
+import SimpleITK as sitk
 
 # Add project root to path
 project_root = Path(__file__).resolve().parent.parent
@@ -20,8 +20,9 @@ sys.path.insert(0, str(project_root))
 from core.config import Config
 from core.config_loader import load_config
 from core.global_setting import SystemSetting
-from data.Dataset import MedicalPatchDataset
+from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
+from script.eval_split import evaluate
 
 
 def parse_args() -> argparse.Namespace:
@@ -148,105 +149,133 @@ def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor
     return target
 
 
+def combine_to_nifti(patch_list: list[torch.Tensor], patch_shape: tuple[int, int, int], src_shape: tuple[int, int, int]) -> sitk.Image:
+    """Stitch sequentially traversed prediction patches back into a volume.
+
+    The patch order must match `MedicalPatchDataset.__getitem__`: z -> y -> x,
+    non-overlapping full patches only. Because `patches_per_volume` is a cap, the
+    stitched result may cover only the first part of the source volume; uncovered
+    voxels remain zero.
+    """
+    if not patch_list:
+        raise ValueError("Cannot stitch prediction result: patch_list is empty.")
+
+    patch_d, patch_h, patch_w = patch_shape
+    src_d, src_h, src_w = src_shape
+    combined = torch.zeros(src_shape, dtype=torch.float32)
+    patch_idx = 0
+
+    for z in range(0, src_d - patch_d + 1, patch_d):
+        for y in range(0, src_h - patch_h + 1, patch_h):
+            for x in range(0, src_w - patch_w + 1, patch_w):
+                if patch_idx >= len(patch_list):
+                    return sitk.GetImageFromArray(combined.numpy())
+
+                patch = patch_list[patch_idx].detach().cpu()
+                if patch.ndim == 5:
+                    patch = patch[0, 0]
+                elif patch.ndim == 4:
+                    patch = patch[0]
+                if tuple(patch.shape) != patch_shape:
+                    raise ValueError(f"Invalid prediction patch shape: {tuple(patch.shape)}, expected {patch_shape}")
+
+                combined[z:z + patch_d, y:y + patch_h, x:x + patch_w] = patch.float()
+                patch_idx += 1
+
+    return sitk.GetImageFromArray(combined.numpy())
+
+
 def train_one_epoch(
     model: torch.nn.Module,
-    dataloader: DataLoader,
+    dataset: MedicalPatchDataset,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     epoch: int,
-    writer: SummaryWriter
+    writer: SummaryWriter,
+    prediction_dir: Path,
+    store_single_res: bool = True,
 ) -> float:
-    """Train for one epoch."""
+    """Train for one epoch by loading one case at a time."""
     model.train()
     epoch_loss = 0.0
     num_batches = 0
-    
-    progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1} Training")
-    
-    for batch_idx, (images, labels) in enumerate(progress_bar):
+
+    total_volumes = len(dataset)
+    logging.info("Epoch %s training started: total_volumes=%s", epoch + 1, total_volumes)
+
+    for batch_idx in range(total_volumes):
+        logging.info("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
+        _, label_src = dataset.get_src_item(batch_idx)
+        images, labels = dataset[batch_idx]
+        patch_list: list[torch.Tensor] = []
+
         if labels is None:
+            logging.warning("Epoch %s volume %s/%s has no labels. Skipping.", epoch + 1, batch_idx + 1, total_volumes)
             continue
-            
-        images = images.to(device)
-        labels = labels.float().to(device)
-        
-        # Forward pass
-        optimizer.zero_grad()
-        outputs = model(images)
-        labels = align_target_shape(outputs, labels)
-        loss = combined_loss(outputs, labels)
-        
-        # Backward pass
-        loss.backward()
-        optimizer.step()
-        
-        # Update metrics
-        epoch_loss += loss.item()
-        num_batches += 1
-        
-        # Update progress bar
-        avg_loss = epoch_loss / num_batches
-        progress_bar.set_postfix({"loss": f"{avg_loss:.4f}"})
-        
-        # Log to TensorBoard every 10 batches
-        if batch_idx % 10 == 0:
-            writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataloader) + batch_idx)
-    
+
+        patch_count = int(images.shape[0])
+        logging.info(
+            "Epoch %s volume %s/%s loaded: patches=%s image_shape=%s label_shape=%s",
+            epoch + 1,
+            batch_idx + 1,
+            total_volumes,
+            patch_count,
+            tuple(images.shape),
+            tuple(labels.shape),
+        )
+
+        for patch_idx in range(patch_count):
+            logging.info(
+                "Epoch %s volume %s/%s patch %s/%s training started",
+                epoch + 1,
+                batch_idx + 1,
+                total_volumes,
+                patch_idx + 1,
+                patch_count,
+            )
+
+            patch_images = images[patch_idx:patch_idx + 1].to(device)
+            patch_labels = labels[patch_idx:patch_idx + 1].float().to(device)
+
+            optimizer.zero_grad()
+            outputs = model(patch_images)
+            patch_labels = align_target_shape(outputs, patch_labels)
+            loss = combined_loss(outputs, patch_labels)
+            loss.backward()
+            optimizer.step()
+
+            if store_single_res and batch_idx == 0:
+                patch_list.append(outputs.detach().cpu())
+
+            epoch_loss += loss.item()
+            num_batches += 1
+            avg_loss = epoch_loss / num_batches
+            logging.info(
+                "Epoch %s volume %s/%s patch %s/%s done: loss=%.6f avg_loss=%.6f global_patch_step=%s",
+                epoch + 1,
+                batch_idx + 1,
+                total_volumes,
+                patch_idx + 1,
+                patch_count,
+                loss.item(),
+                avg_loss,
+                num_batches,
+            )
+
+            if num_batches % 10 == 0:
+                writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
+
+        if store_single_res and batch_idx == 0:
+            src_shape_tuple = tuple(int(dim) for dim in label_src.shape)
+            if len(src_shape_tuple) != 3:
+                raise ValueError(f"Invalid source shape: {src_shape_tuple}")
+            prediction_dir.mkdir(parents=True, exist_ok=True)
+            nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple)
+            prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{batch_idx:04d}_prediction.nii.gz"
+            sitk.WriteImage(nifti, str(prediction_path))
+            logging.info("Saved sample prediction to %s", prediction_path)
+
     return epoch_loss / max(num_batches, 1)
-
-
-@torch.no_grad()
-def evaluate(
-    model: torch.nn.Module,
-    dataloader: DataLoader,
-    device: torch.device,
-    epoch: int,
-    writer: SummaryWriter
-) -> float:
-    """Evaluate model on validation set."""
-    model.eval()
-    epoch_loss = 0.0
-    epoch_dice = 0.0
-    num_batches = 0
-    
-    progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1} Validation")
-    
-    for images, labels in progress_bar:
-        if labels is None:
-            continue
-            
-        images = images.to(device)
-        labels = labels.float().to(device)
-        
-        # Forward pass
-        outputs = model(images)
-        labels = align_target_shape(outputs, labels)
-        loss = combined_loss(outputs, labels)
-        
-        # Compute Dice score
-        pred_binary = (outputs > 0.5).float()
-        dice = 1.0 - dice_loss(pred_binary, labels)
-        
-        # Update metrics
-        epoch_loss += loss.item()
-        epoch_dice += dice.item()
-        num_batches += 1
-        
-        # Update progress bar
-        avg_loss = epoch_loss / num_batches
-        avg_dice = epoch_dice / num_batches
-        progress_bar.set_postfix({"loss": f"{avg_loss:.4f}", "dice": f"{avg_dice:.4f}"})
-    
-    avg_loss = epoch_loss / max(num_batches, 1)
-    avg_dice = epoch_dice / max(num_batches, 1)
-    
-    # Log to TensorBoard
-    writer.add_scalar("Loss/val", avg_loss, epoch)
-    writer.add_scalar("Dice/val", avg_dice, epoch)
-    
-    logging.info(f"Validation - Loss: {avg_loss:.4f}, Dice: {avg_dice:.4f}")
-    
-    return avg_dice
 
 
 def save_checkpoint(
@@ -347,7 +376,6 @@ def main() -> None:
     train_dataset = MedicalPatchDataset(
         cfg=cfg.data,
         patch_size=patch_size,
-        patches_per_volume=cfg.train.max_patches_per_volume or 1,
         seed=cfg.seed
     )
     
@@ -356,26 +384,7 @@ def main() -> None:
     val_dataset = MedicalPatchDataset(
         cfg=cfg.data,
         patch_size=patch_size,
-        patches_per_volume=max(1, cfg.train.max_patches_per_volume // 4 if cfg.train.max_patches_per_volume else 1),
         seed=cfg.seed + 1
-    )
-    
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=cfg.train.batch_size,
-        shuffle=True,
-        num_workers=cfg.data.num_workers,
-        prefetch_factor=cfg.data.prefetch_factor if cfg.data.num_workers > 0 else None,
-        pin_memory=True
-    )
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=cfg.train.batch_size,
-        shuffle=False,
-        num_workers=cfg.data.num_workers,
-        prefetch_factor=cfg.data.prefetch_factor if cfg.data.num_workers > 0 else None,
-        pin_memory=True
     )
     
     logging.info(f"Training samples: {len(train_dataset)}")
@@ -396,14 +405,26 @@ def main() -> None:
     logging.info("Starting training...")
     best_dice = max(best_dice, 0.0)
     
+    checkpoint_dir = Path(cfg.checkpoint.save_dir)
+    prediction_dir = checkpoint_dir / "predictions"
+
     for epoch in range(start_epoch, cfg.train.epochs):
         # Train
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, epoch, writer)
+        train_loss = train_one_epoch(
+            model,
+            train_dataset,
+            optimizer,
+            device,
+            epoch,
+            writer,
+            prediction_dir=prediction_dir,
+            store_single_res=True,
+        )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
         
         # Evaluate
         if (epoch + 1) % cfg.eval_interval == 0:
-            val_dice = evaluate(model, val_loader, device, epoch, writer)
+            val_dice = evaluate(model, val_dataset, device, epoch, writer)
             
             # Check if best model
             is_best = val_dice > best_dice
@@ -411,7 +432,6 @@ def main() -> None:
                 best_dice = val_dice
             
             # Save checkpoint
-            checkpoint_dir = Path(cfg.checkpoint.save_dir)
             save_checkpoint(
                 model,
                 optimizer,
@@ -428,7 +448,6 @@ def main() -> None:
         
         # Periodic checkpoint saving
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:
-            checkpoint_dir = Path(cfg.checkpoint.save_dir)
             save_checkpoint(
                 model,
                 optimizer,

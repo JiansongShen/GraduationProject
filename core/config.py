@@ -38,6 +38,7 @@ class TrainConfig:
 @dataclass
 class DataConfig:
     """数据配置"""
+    patches_per_volume: int = 64
     train_dirs: list[str] = field(default_factory=list)
     eval_dirs: list[str] = field(default_factory=list)
     num_workers: int = 4
@@ -76,7 +77,7 @@ class CheckpointConfig:
 
 @dataclass
 class RiskConfig:
-    """风险预测任务配置（结构化表格二分类）"""
+    """风险预测任务配置（CTA + 表格特征）"""
 
     enabled: bool = False
     excel_path: str = "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
@@ -103,6 +104,10 @@ class RiskConfig:
     auto_max_features: int = 64
     feature_select_method: str = "mutual_info"
     categorical_min_frequency: int = 5
+    radiomics_backend: str = "pyradiomics-cuda"
+    cta_viewer_mode: str = "tri-planar"
+    segmentation_endpoint: str = "/api/cta/segment"
+    risk_endpoint: str = "/api/risk/predict"
 
 
 @dataclass

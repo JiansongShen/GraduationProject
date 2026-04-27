@@ -5,6 +5,8 @@ import math
 import torch
 from torch import nn
 
+from model.risk.CrossAttentionBlock import CrossAttentionBlock
+
 
 class RiskCrossAttentionModel(nn.Module):
     """Cross-attention model with separate numeric/categorical token streams."""

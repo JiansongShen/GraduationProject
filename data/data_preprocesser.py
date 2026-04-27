@@ -1,3 +1,5 @@
+import logging
+
 import SimpleITK as sitk
 from typing import Tuple, Optional, List, Final
 
@@ -6,7 +8,7 @@ NiftiImage = sitk.Image
 
 def resample_in_memory(
         image: NiftiImage,
-        target_spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        target_spacing: Tuple[float, float, float] = (0.5, 0.5, 0.5),
         is_mask: bool = False
 ) -> NiftiImage:
     """
@@ -37,4 +39,5 @@ def resample_in_memory(
     resampler.SetDefaultPixelValue(0)
 
     # 5. Execute and return the memory-resident object
+    logging.info(f"Resampling {image.GetSize()} to {new_size}...")
     return resampler.Execute(image)
