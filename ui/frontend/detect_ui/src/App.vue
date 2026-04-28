@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Niivue } from '@niivue/niivue'
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import {Niivue} from '@niivue/niivue'
+import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
 
 type RiskResponse = {
   ok: boolean
@@ -18,8 +18,12 @@ const apiBase = ''
 const mainCanvas = ref<HTMLCanvasElement | null>(null)
 const compareCanvas = ref<HTMLCanvasElement | null>(null)
 
-const mainViewer = new Niivue()
-const compareViewer = new Niivue()
+const mainViewer = new Niivue(
+    {logLevel: 'debug'}
+)
+const compareViewer = new Niivue(
+    {logLevel: 'debug'}
+)
 
 const sourceFile = ref<File | null>(null)
 const compareFile = ref<File | null>(null)
@@ -78,7 +82,7 @@ function buildVolumeList(baseUrl?: string, overlayUrl?: string) {
   if (baseUrl) {
     volumes.push({
       url: baseUrl,
-      name: 'CTA',
+      name: 'CTA' + baseUrl,
       colorMap: 'gray',
       opacity: 1,
     })
@@ -86,7 +90,7 @@ function buildVolumeList(baseUrl?: string, overlayUrl?: string) {
   if (overlayUrl) {
     volumes.push({
       url: overlayUrl,
-      name: 'Mask',
+      name: 'Mask' + overlayUrl,
       colorMap: 'red',
       opacity: 0.55,
     })
@@ -115,7 +119,7 @@ async function renderCompareViewer() {
   await compareViewer.loadVolumes([
     {
       url: compareViewerUrl.value,
-      name: 'Comparison',
+      name: 'Comparison' + compareViewerUrl.value,
       colorMap: 'gray',
       opacity: 1,
     },
@@ -143,6 +147,7 @@ async function uploadSourceCta() {
     console.log('[viewer] uploadSourceCta rendered')
     statusMessage.value = 'CTA 文件上传成功，已显示在左侧视图。'
   } catch (error) {
+    console.log(error)
     statusMessage.value = `CTA 上传失败：${String(error)}`
   } finally {
     busy.upload = false
@@ -194,7 +199,7 @@ async function uploadComparisonFile() {
     const data = await uploadFileToBackend(compareFile.value)
     compareViewerUrl.value = data.file_path
     await renderCompareViewer()
-    statusMessage.value = '对比文件已上传，并显示在右侧视图。'
+    statusMessage.value = '对比文件已上传，并显示在下侧视图。'
   } catch (error) {
     statusMessage.value = `对比文件上传失败：${String(error)}`
   } finally {
@@ -219,16 +224,16 @@ async function predictRisk() {
     formData.append('age', clinicForm.age)
     formData.append('sex', clinicForm.sex)
     formData.append(
-      'extra_metadata',
-      JSON.stringify({
-        高血压: clinicForm.hypertension,
-        心脏病: clinicForm.heartDisease,
-        糖尿病: clinicForm.diabetes,
-        脑血管硬化: clinicForm.atherosclerosis,
-        饮酒: clinicForm.drinking,
-        抽烟: clinicForm.smoking,
-        出血史: clinicForm.hemorrhageHistory,
-      }),
+        'extra_metadata',
+        JSON.stringify({
+          高血压: clinicForm.hypertension,
+          心脏病: clinicForm.heartDisease,
+          糖尿病: clinicForm.diabetes,
+          脑血管硬化: clinicForm.atherosclerosis,
+          饮酒: clinicForm.drinking,
+          抽烟: clinicForm.smoking,
+          出血史: clinicForm.hemorrhageHistory,
+        }),
     )
 
     const response = await fetch(`${apiBase}/api/risk/predict`, {
@@ -301,7 +306,7 @@ onBeforeUnmount(() => {
         <h2>CTA 操作</h2>
         <label class="field">
           <span>CTA 源文件</span>
-          <input type="file" accept=".nii,.nii.gz" @change="onSourceFileChange" />
+          <input type="file" accept=".nii,.nii.gz" @change="onSourceFileChange"/>
         </label>
         <div class="button-row">
           <button :disabled="busy.upload || !sourceFile" @click="uploadSourceCta">
@@ -315,15 +320,15 @@ onBeforeUnmount(() => {
         <h2>对比文件</h2>
         <label class="field">
           <span>对比 CTA / Mask</span>
-          <input type="file" accept=".nii,.nii.gz" @change="onCompareFileChange" />
+          <input type="file" accept=".nii,.nii.gz" @change="onCompareFileChange"/>
         </label>
-        <button :disabled="!compareFile" @click="uploadComparisonFile">加载到右侧对比视图</button>
+        <button :disabled="!compareFile" @click="uploadComparisonFile">加载到下侧对比视图</button>
 
         <h2>风险预测输入</h2>
         <div class="form-grid">
           <label class="field">
             <span>年龄</span>
-            <input v-model="clinicForm.age" type="number" placeholder="例如 63" />
+            <input v-model="clinicForm.age" type="number" placeholder="例如 63"/>
           </label>
           <label class="field">
             <span>性别</span>
@@ -335,31 +340,31 @@ onBeforeUnmount(() => {
           </label>
           <label class="field">
             <span>高血压</span>
-            <input v-model="clinicForm.hypertension" placeholder="有 / 无" />
+            <input v-model="clinicForm.hypertension" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>心脏病</span>
-            <input v-model="clinicForm.heartDisease" placeholder="有 / 无" />
+            <input v-model="clinicForm.heartDisease" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>糖尿病</span>
-            <input v-model="clinicForm.diabetes" placeholder="有 / 无" />
+            <input v-model="clinicForm.diabetes" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>脑血管硬化</span>
-            <input v-model="clinicForm.atherosclerosis" placeholder="有 / 无" />
+            <input v-model="clinicForm.atherosclerosis" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>饮酒</span>
-            <input v-model="clinicForm.drinking" placeholder="有 / 无" />
+            <input v-model="clinicForm.drinking" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>抽烟</span>
-            <input v-model="clinicForm.smoking" placeholder="有 / 无" />
+            <input v-model="clinicForm.smoking" placeholder="有 / 无"/>
           </label>
           <label class="field">
             <span>出血史</span>
-            <input v-model="clinicForm.hemorrhageHistory" placeholder="有 / 无" />
+            <input v-model="clinicForm.hemorrhageHistory" placeholder="有 / 无"/>
           </label>
         </div>
         <button class="primary" :disabled="busy.predict || !sourceFile" @click="predictRisk">
@@ -406,6 +411,6 @@ onBeforeUnmount(() => {
         </section>
 
       </section>
-      </main>
+    </main>
   </div>
 </template>
