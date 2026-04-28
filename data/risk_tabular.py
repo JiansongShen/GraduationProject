@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -11,6 +13,20 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
 from core.config import RiskConfig
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CLINIC_COLUMNS = [
+    "性别",
+    "年龄",
+    "高血压",
+    "心脏病",
+    "糖尿病",
+    "脑血管硬化",
+    "饮酒",
+    "抽烟",
+    "出血史",
+]
 
 
 @dataclass(frozen=True)
@@ -84,6 +100,99 @@ def _load_dataframe(cfg: RiskConfig) -> pd.DataFrame:
     return pd.read_excel(excel_path)
 
 
+def extract_pyradiomics_features_from_predict_res_and_src(
+    predict_res_path: str,
+    src_path: str,
+) -> dict[str, float]:
+    """Extract numeric pyradiomics features from prediction mask and source volume."""
+    try:
+        import SimpleITK as sitk
+        from radiomics import featureextractor
+    except Exception as exc:  # pragma: no cover - runtime dependency
+        logger.warning("Pyradiomics dependency unavailable: %s", exc)
+        return {}
+
+    image = sitk.ReadImage(src_path)
+    mask = sitk.ReadImage(predict_res_path)
+    extractor = featureextractor.RadiomicsFeatureExtractor(
+        binWidth=25.0,
+        resampledPixelSpacing=None,
+        interpolator=sitk.sitkBSpline,
+        verbose=False,
+    )
+    extractor.enableImageTypes(
+        Original={},
+        Wavelet={},
+        LoG={"sigma": [1.0, 3.0, 5.0]},
+        Exponential={},
+        Gradient={},
+        LBP2D={},
+        LBP3D={},
+    )
+    extractor.enableAllFeatures()
+    result = extractor.execute(image, mask)
+    numeric_features: dict[str, float] = {}
+    for key, value in result.items():
+        if key.startswith("diagnostics_"):
+            continue
+        if isinstance(value, (int, float, np.number)):
+            numeric_features[key] = float(value)
+    return numeric_features
+
+
+def _resolve_saved_data_paths(cfg: RiskConfig) -> tuple[Path | None, Path | None]:
+    if cfg.predict_res_path and cfg.src_path:
+        predict_res_path = Path(cfg.predict_res_path)
+        src_path = Path(cfg.src_path)
+        return predict_res_path, src_path
+
+    saved_data_dir = Path(cfg.saved_data_dir)
+    if not saved_data_dir.is_absolute():
+        saved_data_dir = Path(__file__).resolve().parent.parent / saved_data_dir
+    if not saved_data_dir.exists():
+        return None, None
+
+    src_candidates = sorted(saved_data_dir.glob("*_origin.nii.gz"))
+    predict_res_candidates = sorted(saved_data_dir.glob("*_label.nii.gz"))
+    if not src_candidates or not predict_res_candidates:
+        return None, None
+    return predict_res_candidates[0], src_candidates[0]
+
+
+def _select_overlap_and_clinic_columns(raw_df: pd.DataFrame, cfg: RiskConfig) -> pd.DataFrame:
+    """Keep only overlap(pyradiomics, train columns) + configured clinic columns."""
+    predict_res_path, src_path = _resolve_saved_data_paths(cfg)
+    overlap_columns: list[str] = []
+    if predict_res_path and src_path:
+        try:
+            pyradiomics_features = extract_pyradiomics_features_from_predict_res_and_src(
+                predict_res_path=str(predict_res_path),
+                src_path=str(src_path),
+            )
+            overlap_columns = [col for col in raw_df.columns if col in pyradiomics_features]
+            logger.info(
+                "Selected %d overlapped pyradiomics columns from %s and %s.",
+                len(overlap_columns),
+                predict_res_path,
+                src_path,
+            )
+        except Exception as exc:
+            logger.warning("Failed to compute overlap pyradiomics columns: %s", exc)
+    else:
+        logger.warning("No predict_res/src files found, skipped pyradiomics overlap selection.")
+
+    clinic_columns = cfg.clinic_columns or DEFAULT_CLINIC_COLUMNS
+    clinic_present = [col for col in clinic_columns if col in raw_df.columns]
+    selected = overlap_columns + [col for col in clinic_present if col not in overlap_columns]
+    required_columns = [cfg.id_column, cfg.label_column]
+    selected += [col for col in required_columns if col in raw_df.columns and col not in selected]
+
+    if not selected:
+        logger.warning("No overlap/clinic columns selected, falling back to original dataframe.")
+        return raw_df
+    return raw_df[selected].copy()
+
+
 def _clean_dataframe(df: pd.DataFrame, cfg: RiskConfig) -> pd.DataFrame:
     """Basic robust cleaning for tabular medical data."""
     if not cfg.use_cleaned_data:
@@ -152,6 +261,8 @@ def _select_top_numeric_features(
 def build_risk_data_bundle(cfg: RiskConfig) -> RiskDataBundle:
     """Load, preprocess, split and select columns for risk task."""
     raw_df = _load_dataframe(cfg)
+    if cfg.use_pyradiomics_overlap_only:
+        raw_df = _select_overlap_and_clinic_columns(raw_df, cfg)
     df = _clean_dataframe(raw_df, cfg)
     _validate_columns(df, cfg)
 

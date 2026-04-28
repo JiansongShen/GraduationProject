@@ -79,6 +79,11 @@ risk:
   auto_max_features: 64
   feature_select_method: "mutual_info"
   categorical_min_frequency: 5
+  use_pyradiomics_overlap_only: true
+  clinic_columns: ["性别", "年龄", "高血压", "心脏病", "糖尿病", "脑血管硬化", "饮酒", "抽烟", "出血史"]
+  saved_data_dir: "data/saved_data"
+  predict_res_path: ""
+  src_path: ""
 
 device: "cuda"
 seed: 42
