@@ -2,6 +2,7 @@
 """Training script for 3D medical image segmentation with configurable models."""
 
 import argparse
+import dataclasses
 import logging
 import sys
 from pathlib import Path
@@ -379,10 +380,17 @@ def main() -> None:
         seed=cfg.seed
     )
     
-    # For now, use same dataset structure for validation
-    # In practice, you'd want separate validation directories
+    eval_data_cfg = cfg.data
+    if cfg.data.eval_dirs:
+        eval_data_cfg = dataclasses.replace(cfg.data, train_dirs=list(cfg.data.eval_dirs))
+        logging.info("Using dedicated eval dirs: %s", cfg.data.eval_dirs)
+    else:
+        logging.warning(
+            "No eval_dirs configured under data.eval_dirs; validation will reuse train_dirs."
+        )
+
     val_dataset = MedicalPatchDataset(
-        cfg=cfg.data,
+        cfg=eval_data_cfg,
         patch_size=patch_size,
         seed=cfg.seed + 1
     )
@@ -424,7 +432,15 @@ def main() -> None:
         
         # Evaluate
         if (epoch + 1) % cfg.eval_interval == 0:
-            val_dice = evaluate(model, val_dataset, device, epoch, writer)
+            val_dice = evaluate(
+                model,
+                val_dataset,
+                device,
+                epoch,
+                writer,
+                prediction_dir=prediction_dir / "eval",
+                store_single_res=True,
+            )
             
             # Check if best model
             is_best = val_dice > best_dice
