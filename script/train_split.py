@@ -23,7 +23,7 @@ from core.config_loader import load_config
 from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
-from script.eval_split import evaluate, dice_loss
+from script.eval_split import evaluate, dice_loss, combined_loss
 
 
 def parse_args() -> argparse.Namespace:
@@ -221,7 +221,7 @@ def train_one_epoch(
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
             # Using dice_loss as combined_loss was not defined/imported
-            loss = dice_loss(outputs, batch_labels)
+            loss = combined_loss(outputs, batch_labels)
             loss.backward()
             optimizer.step()
 

@@ -49,6 +49,8 @@ data:
   label_suffix: "_label.nii.gz"
   train_ratio: 0.8
   patches_per_volume: 64
+  patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
+  background_per_foreground: 2    
 
 async_load:
   ram_cache_gb: 30.0

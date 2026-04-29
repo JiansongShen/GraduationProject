@@ -131,7 +131,7 @@ class MedicalPatchDataset(TorchDataset):
         simple and avoids loading the whole dataset into memory just to build pairs.
         """
         for pattern in self.cfg.file_patterns:
-            suffix = pattern.replace("*", "")
+            suffix = pattern.replace("*", ""    )
             if image_path.endswith(suffix):
                 return image_path[: -len(suffix)] + self.cfg.label_suffix
         return None
