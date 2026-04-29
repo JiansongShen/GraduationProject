@@ -300,6 +300,6 @@ class MedicalPatchDataset(TorchDataset):
         patch[dst_z0:dst_z1, dst_y0:dst_y1, dst_x0:dst_x1] = array[src_z0:src_z1, src_y0:src_y1, src_x0:src_x1]
         return patch
 
-    def get_src_item(self, batch_idx: int) -> tuple[Tensor, Tensor]:
+    def get_src_item(self, batch_idx: int) -> tuple[Tensor, Tensor | None]:
         image, label = self._load_case(self.cases[batch_idx])
-        return Tensor(image), Tensor(label)
+        return Tensor(image), Tensor(label) if label is not None else None

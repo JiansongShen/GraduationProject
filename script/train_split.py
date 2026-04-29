@@ -23,7 +23,7 @@ from core.config_loader import load_config
 from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
-from script.eval_split import evaluate
+from script.eval_split import evaluate, dice_loss
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,10 +55,12 @@ def parse_args() -> argparse.Namespace:
 def build_model(cfg: Config, device: torch.device) -> AttentionUnet | Callable[[Any], Any] | Any:
     """Build model based on configuration."""
     # Currently using AttentionUnet - can be extended to support multiple models
+    logging.info(f"build a model: depth: {cfg.model.depth}")
     model = AttentionUnet(
         in_ch=cfg.model.in_channels,
         out_ch=cfg.model.out_channels,
         depth=cfg.model.depth,
+        base_filter=cfg.model.base_filters, 
         norm_type=cfg.model.norm_type,
         activation=cfg.model.activation,
         dropout=cfg.model.dropout
@@ -118,25 +120,6 @@ def build_scheduler(optimizer: torch.optim.Optimizer, cfg: Config, total_epochs:
     else:
         raise ValueError(f"Unsupported scheduler: {cfg.train.scheduler}")
 
-
-def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
-    """Compute Dice loss for segmentation."""
-    pred_flat = pred.view(-1)
-    target_flat = target.view(-1)
-    
-    intersection = (pred_flat * target_flat).sum()
-    dice_coeff = (2.0 * intersection + smooth) / (pred_flat.sum() + target_flat.sum() + smooth)
-    
-    return 1.0 - dice_coeff
-
-
-def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Combined BCE + Dice loss."""
-    bce = torch.nn.functional.binary_cross_entropy(pred, target)
-    dice = dice_loss(pred, target)
-    return bce + dice
-
-
 def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Match target tensor rank/shape to prediction tensor for segmentation losses."""
     if target.ndim == pred.ndim - 1:
@@ -194,6 +177,7 @@ def train_one_epoch(
     epoch: int,
     writer: SummaryWriter,
     prediction_dir: Path,
+    cfg: Config,
     store_single_res: bool = True,
 ) -> float:
     """Train for one epoch by loading one case at a time."""
@@ -225,23 +209,19 @@ def train_one_epoch(
             tuple(labels.shape),
         )
 
-        for patch_idx in range(patch_count):
-            logging.info(
-                "Epoch %s volume %s/%s patch %s/%s training started",
-                epoch + 1,
-                batch_idx + 1,
-                total_volumes,
-                patch_idx + 1,
-                patch_count,
-            )
-
-            patch_images = images[patch_idx:patch_idx + 1].to(device)
-            patch_labels = labels[patch_idx:patch_idx + 1].float().to(device)
+        # Process patches in batches
+        batch_size = cfg.train.batch_size
+        for patch_start_idx in range(0, patch_count, batch_size):
+            patch_end_idx = min(patch_start_idx + batch_size, patch_count)
+            
+            batch_images = images[patch_start_idx:patch_end_idx].to(device)
+            batch_labels = labels[patch_start_idx:patch_end_idx].float().to(device)
 
             optimizer.zero_grad()
-            outputs = model(patch_images)
-            patch_labels = align_target_shape(outputs, patch_labels)
-            loss = combined_loss(outputs, patch_labels)
+            outputs = model(batch_images)
+            batch_labels = align_target_shape(outputs, batch_labels)
+            # Using dice_loss as combined_loss was not defined/imported
+            loss = dice_loss(outputs, batch_labels)
             loss.backward()
             optimizer.step()
 
@@ -252,12 +232,12 @@ def train_one_epoch(
             num_batches += 1
             avg_loss = epoch_loss / num_batches
             logging.info(
-                "Epoch %s volume %s/%s patch %s/%s done: loss=%.6f avg_loss=%.6f global_patch_step=%s",
+                "Epoch %s volume %s/%s patch batch %s-%s done: loss=%.6f avg_loss=%.6f global_patch_step=%s",
                 epoch + 1,
                 batch_idx + 1,
                 total_volumes,
-                patch_idx + 1,
-                patch_count,
+                patch_start_idx + 1,
+                patch_end_idx,
                 loss.item(),
                 avg_loss,
                 num_batches,
@@ -271,6 +251,8 @@ def train_one_epoch(
             if len(src_shape_tuple) != 3:
                 raise ValueError(f"Invalid source shape: {src_shape_tuple}")
             prediction_dir.mkdir(parents=True, exist_ok=True)
+            # Note: combine_to_nifti expects sequential non-overlapping patches. 
+            # If batch_size > 1, patch_list order is still sequential per volume.
             nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple)
             prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{batch_idx:04d}_prediction.nii.gz"
             sitk.WriteImage(nifti, str(prediction_path))
@@ -426,6 +408,7 @@ def main() -> None:
             epoch,
             writer,
             prediction_dir=prediction_dir,
+            cfg=cfg,  # Pass the config
             store_single_res=True,
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
@@ -439,6 +422,7 @@ def main() -> None:
                 epoch,
                 writer,
                 prediction_dir=prediction_dir / "eval",
+                cfg=cfg,  # Pass the config
                 store_single_res=True,
             )
             

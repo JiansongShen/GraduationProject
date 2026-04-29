@@ -76,6 +76,7 @@ def evaluate(
     epoch: int,
     writer: SummaryWriter,
     prediction_dir: Path | None = None,
+    cfg = None,  # Add config parameter (optional to maintain compatibility)
     store_single_res: bool = True,
 ) -> float:
     model.eval()
@@ -106,26 +107,24 @@ def evaluate(
             tuple(labels.shape),
         )
 
-        for patch_idx in range(patch_count):
-            logging.info(
-                "Epoch %s validation volume %s/%s patch %s/%s started",
-                epoch + 1,
-                sample_idx + 1,
-                total_volumes,
-                patch_idx + 1,
-                patch_count,
-            )
-            patch_images = images[patch_idx : patch_idx + 1].to(device)
-            patch_labels = labels[patch_idx : patch_idx + 1].float().to(device)
+        # Process patches in batches during evaluation
+        batch_size = cfg.train.batch_size if cfg is not None else 1  # Use config batch size if available
+        for patch_start_idx in range(0, patch_count, batch_size):
+            patch_end_idx = min(patch_start_idx + batch_size, patch_count)
+            
+            batch_images = images[patch_start_idx:patch_end_idx].to(device)
+            batch_labels = labels[patch_start_idx:patch_end_idx].float().to(device)
 
-            outputs = model(patch_images)
-            patch_labels = align_target_shape(outputs, patch_labels)
-            loss = combined_loss(outputs, patch_labels)
+            outputs = model(batch_images)
+            batch_labels = align_target_shape(outputs, batch_labels)
+            loss = combined_loss(outputs, batch_labels)
+
+            # If storing single results and this is the first volume, store outputs
             if store_single_res and sample_idx == 0:
-                patch_list.append(outputs.detach().cpu())
+                patch_list.extend([output_tensor.unsqueeze(0) for output_tensor in outputs])
 
             pred_binary = (outputs > 0.5).float()
-            dice = 1.0 - dice_loss(pred_binary, patch_labels)
+            dice = 1.0 - dice_loss(pred_binary, batch_labels)
 
             epoch_loss += loss.item()
             epoch_dice += dice.item()
@@ -134,12 +133,12 @@ def evaluate(
             avg_loss = epoch_loss / num_batches
             avg_dice = epoch_dice / num_batches
             logging.info(
-                "Epoch %s validation volume %s/%s patch %s/%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f global_patch_step=%s",
+                "Epoch %s validation volume %s/%s patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f global_patch_step=%s",
                 epoch + 1,
                 sample_idx + 1,
                 total_volumes,
-                patch_idx + 1,
-                patch_count,
+                patch_start_idx + 1,
+                patch_end_idx,
                 loss.item(),
                 dice.item(),
                 avg_loss,
@@ -152,10 +151,14 @@ def evaluate(
             if len(src_shape_tuple) != 3:
                 raise ValueError(f"Invalid eval source shape: {src_shape_tuple}")
             prediction_dir.mkdir(parents=True, exist_ok=True)
-            nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple)
-            prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_prediction.nii.gz"
-            sitk.WriteImage(nifti, str(prediction_path))
-            logging.info("Saved eval sample prediction to %s", prediction_path)
+            # Combine only the first batch of patches for visualization
+            if patch_list:
+                # Take the first patch from the batch for visualization
+                first_patch = patch_list[0].squeeze(0).unsqueeze(0)  # Shape: [1, D, H, W]
+                nifti = combine_to_nifti([first_patch], dataset.patch_size, src_shape_tuple)
+                prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_prediction.nii.gz"
+                sitk.WriteImage(nifti, str(prediction_path))
+                logging.info("Saved eval sample prediction to %s", prediction_path)
 
     avg_loss = epoch_loss / max(num_batches, 1)
     avg_dice = epoch_dice / max(num_batches, 1)

@@ -21,6 +21,7 @@ class AttentionUnet(Unet):
         in_ch: int,
         out_ch: int,
         depth: int = 4,
+        base_filter: int = 8,
         norm_type: str = "batch",
         activation: str = "relu",
         dropout: float = 0.2,
@@ -28,10 +29,7 @@ class AttentionUnet(Unet):
         super().__init__()
         self.depth = depth
 
-        # The encoder uses `out_ch` as the base number of channels in the current
-        # project structure, so we preserve that behavior while making the channel
-        # list explicit for the decoder.
-        self.encoder = UnetEncoder(in_ch, out_ch, self.depth, norm_type, activation, dropout)
+        self.encoder = UnetEncoder(in_ch, base_filter, self.depth, norm_type, activation, dropout)
         self.decoder = UnetDecoder(self.encoder.channels(), out_ch, self.depth, norm_type, activation, dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

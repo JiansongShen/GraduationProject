@@ -199,3 +199,27 @@
 2026-04-27 14:23:05,233 - INFO - Epoch 1 volume 9/649 patch 1/1 training started
 2026-04-27 14:23:05,340 - INFO - Epoch 1 volume 9/649 patch 1/1 done: loss=1.688093 avg_loss=1.690773 global_patch_step=9
 2026-04-27 14:23:05,340 - INFO - Epoch 1 volume 10/649 loading
+2026-04-29 17:39:21,232 - INFO - Configuration loaded from: config/remote.yaml
+2026-04-29 17:39:21,232 - INFO - Model: unet_base
+2026-04-29 17:39:21,232 - INFO - Device: cuda
+2026-04-29 17:39:21,232 - INFO - Using device: cuda
+2026-04-29 17:39:21,232 - INFO - Building model...
+2026-04-29 17:39:21,232 - INFO - build a model: depth: 4
+2026-04-29 17:39:21,379 - INFO - Model parameters: 5,734
+2026-04-29 17:39:22,094 - INFO - Setting up datasets...
+2026-04-29 17:54:41,466 - INFO - Configuration loaded from: config/remote.yaml
+2026-04-29 17:54:41,467 - INFO - Model: unet_base
+2026-04-29 17:54:41,467 - INFO - Device: cuda
+2026-04-29 17:54:41,467 - INFO - Using device: cuda
+2026-04-29 17:54:41,467 - INFO - Building model...
+2026-04-29 17:54:41,467 - INFO - build a model: depth: 4
+2026-04-29 17:54:41,600 - INFO - Model parameters: 354,250
+2026-04-29 17:54:42,220 - INFO - Setting up datasets...
+2026-04-29 18:03:16,283 - INFO - Configuration loaded from: config/remote.yaml
+2026-04-29 18:03:16,297 - INFO - Model: unet_base
+2026-04-29 18:03:16,297 - INFO - Device: cuda
+2026-04-29 18:03:16,297 - INFO - Using device: cuda
+2026-04-29 18:03:16,297 - INFO - Building model...
+2026-04-29 18:03:16,297 - INFO - build a model: depth: 4
+2026-04-29 18:03:16,537 - INFO - Model parameters: 22,574,602
+2026-04-29 18:03:17,234 - INFO - Setting up datasets...
