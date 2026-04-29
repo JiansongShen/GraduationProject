@@ -48,7 +48,7 @@ checkpoint:
   max_keep: 3
 
 risk:
-  enabled: false
+  enabled: true 
   excel_path: "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
   label_column: "破裂"
   id_column: "7lesion_id"

@@ -83,6 +83,14 @@ class MedicalPatchDataset(TorchDataset):
         self.patches_per_volume = max(1, cfg.patches_per_volume)
         self.foreground_sampling_prob = float(np.clip(foreground_sampling_prob, 0.0, 1.0))
         self.rng = random.Random(seed)
+        self.patch_sampling_mode = cfg.patch_sampling_mode.lower()
+        self.background_per_foreground = max(0, int(cfg.background_per_foreground))
+        valid_sampling_modes = {"sequential", "foreground_priority", "foreground_only"}
+        if self.patch_sampling_mode not in valid_sampling_modes:
+            raise ValueError(
+                f"Unsupported patch_sampling_mode: {cfg.patch_sampling_mode}. "
+                f"Supported modes: {sorted(valid_sampling_modes)}"
+            )
 
         # Build the case list from the configured training directories.
         # Each image file is matched with its corresponding label file if present.
@@ -198,32 +206,106 @@ class MedicalPatchDataset(TorchDataset):
         if label is not None:
             label = self._pad_to_minimum_patch_shape(label)
 
-        image_d, image_h, image_w = image.shape
+        selected_starts = self._select_patch_starts(image, label)
         image_patches: list[Tensor] = []
         label_patches: list[Tensor] = []
-        count = 0
+        for z, y, x in selected_starts:
+            patch_image = image[z:z + patch_d, y:y + patch_h, x:x + patch_w]
+            image_patches.append(torch.from_numpy(patch_image[None, ...].astype(np.float32)))
+            if label is not None:
+                patch_label = label[z:z + patch_d, y:y + patch_h, x:x + patch_w]
+                label_patches.append(torch.from_numpy(patch_label.astype(np.int64)))
 
-        for z in range(0, image_d - patch_d + 1, patch_d):
-            for y in range(0, image_h - patch_h + 1, patch_h):
-                for x in range(0, image_w - patch_w + 1, patch_w):
-                    patch_image = image[z:z + patch_d, y:y + patch_h, x:x + patch_w]
-                    image_patches.append(torch.from_numpy(patch_image[None, ...].astype(np.float32)))
-
-                    if label is not None:
-                        patch_label = label[z:z + patch_d, y:y + patch_h, x:x + patch_w]
-                        label_patches.append(torch.from_numpy(patch_label.astype(np.int64)))
-
-                    count += 1
-                    if count >= self.patches_per_volume:
-                        images_tensor = torch.stack(image_patches, dim=0)
-                        if label is None:
-                            return images_tensor, None
-                        return images_tensor, torch.stack(label_patches, dim=0)
+        if not image_patches:
+            raise ValueError(
+                "No patches were selected for this case. Please check patch_size and patch_sampling_mode."
+            )
 
         images_tensor = torch.stack(image_patches, dim=0)
         if label is None:
             return images_tensor, None
         return images_tensor, torch.stack(label_patches, dim=0)
+
+    def _iter_patch_starts(self, image_shape: tuple[int, int, int]) -> list[tuple[int, int, int]]:
+        patch_d, patch_h, patch_w = self.patch_size
+        image_d, image_h, image_w = image_shape
+        starts: list[tuple[int, int, int]] = []
+        for z in range(0, image_d - patch_d + 1, patch_d):
+            for y in range(0, image_h - patch_h + 1, patch_h):
+                for x in range(0, image_w - patch_w + 1, patch_w):
+                    starts.append((z, y, x))
+        return starts
+
+    def _is_foreground_patch(self, label: np.ndarray, start: tuple[int, int, int]) -> bool:
+        z, y, x = start
+        patch_d, patch_h, patch_w = self.patch_size
+        patch_label = label[z:z + patch_d, y:y + patch_h, x:x + patch_w]
+        return bool((patch_label > 0).any())
+
+    def _select_patch_starts(
+        self, image: np.ndarray, label: Optional[np.ndarray]
+    ) -> list[tuple[int, int, int]]:
+        starts = self._iter_patch_starts(image.shape)
+        if not starts:
+            return []
+
+        if label is None or self.patch_sampling_mode == "sequential":
+            return starts[: self.patches_per_volume]
+
+        foreground_starts: list[tuple[int, int, int]] = []
+        background_starts: list[tuple[int, int, int]] = []
+        for start in starts:
+            if self._is_foreground_patch(label, start):
+                foreground_starts.append(start)
+            else:
+                background_starts.append(start)
+
+        if self.patch_sampling_mode == "foreground_only":
+            if not foreground_starts:
+                logging.warning(
+                    "No foreground patches found in case, falling back to sequential sampling for one case."
+                )
+                return starts[: self.patches_per_volume]
+            return foreground_starts[: self.patches_per_volume]
+
+        if self.patch_sampling_mode == "foreground_priority":
+            if not foreground_starts:
+                logging.warning(
+                    "No foreground patches found in case, falling back to sequential sampling for one case."
+                )
+                return starts[: self.patches_per_volume]
+
+            selected: list[tuple[int, int, int]] = []
+            bg_cursor = 0
+            for fg_start in foreground_starts:
+                if len(selected) >= self.patches_per_volume:
+                    break
+                selected.append(fg_start)
+
+                for _ in range(self.background_per_foreground):
+                    if len(selected) >= self.patches_per_volume:
+                        break
+                    if bg_cursor >= len(background_starts):
+                        break
+                    selected.append(background_starts[bg_cursor])
+                    bg_cursor += 1
+
+            if len(selected) < self.patches_per_volume:
+                for fg_start in foreground_starts:
+                    if len(selected) >= self.patches_per_volume:
+                        break
+                    if fg_start not in selected:
+                        selected.append(fg_start)
+
+            if len(selected) < self.patches_per_volume:
+                for bg_start in background_starts:
+                    if len(selected) >= self.patches_per_volume:
+                        break
+                    if bg_start not in selected:
+                        selected.append(bg_start)
+            return selected
+
+        return starts[: self.patches_per_volume]
 
     def _pad_to_minimum_patch_shape(self, array: np.ndarray) -> np.ndarray:
         """Pad a volume so every dimension can yield at least one full patch."""

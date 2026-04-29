@@ -41,6 +41,8 @@ class DataConfig:
     patches_per_volume: int = 64
     train_dirs: list[str] = field(default_factory=list)
     eval_dirs: list[str] = field(default_factory=list)
+    patch_sampling_mode: str = "sequential"
+    background_per_foreground: int = 2
     num_workers: int = 4
     prefetch_factor: int = 2
     file_patterns: list[str] = field(
