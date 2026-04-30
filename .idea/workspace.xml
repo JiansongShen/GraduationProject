@@ -5,20 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b6d86c24-f051-4fb3-bb99-92df58c09d10" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/checkpoints/best.pth" beforeDir="false" afterPath="$PROJECT_DIR$/checkpoints/best.pth" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/checkpoints/latest.pth" beforeDir="false" afterPath="$PROJECT_DIR$/checkpoints/latest.pth" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/host.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/host.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/remote.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/remote.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/MedicalPatchDataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/MedicalPatchDataset.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/morphology_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/morphology_features.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/logs/training.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/training.log" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/script/eval_split.py" beforeDir="false" afterPath="$PROJECT_DIR$/script/eval_split.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/script/logs/training.log" beforeDir="false" afterPath="$PROJECT_DIR$/script/logs/training.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/script/train_split.py" beforeDir="false" afterPath="$PROJECT_DIR$/script/train_split.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +53,7 @@
     "Python.main.executor": "Run",
     "Python.pyradiomic_test.executor": "Run",
     "Python.start_web.executor": "Run",
-    "Python.train_split.executor": "Debug",
+    "Python.train_split.executor": "Run",
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
@@ -244,29 +234,19 @@
       <workItem from="1777365849106" duration="298000" />
       <workItem from="1777366222920" duration="5095000" />
       <workItem from="1777435170290" duration="16472000" />
-      <workItem from="1777536950976" duration="2048000" />
+      <workItem from="1777536950976" duration="11973000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/script/eval_split.py</url>
-          <line>147</line>
-          <option name="timeStamp" value="3" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
-  </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Gradulate$fastrad_test_py.coverage" NAME="fastrad_test_py Coverage Results" MODIFIED="1777310978699" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temp" />
     <SUITE FILE_PATH="coverage/Gradulate$main.coverage" NAME="main Coverage Results" MODIFIED="1777366145299" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ui" />
     <SUITE FILE_PATH="coverage/Gradulate$start_web.coverage" NAME="start_web Coverage Results" MODIFIED="1777197181695" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/script" />
-    <SUITE FILE_PATH="coverage/Gradulate$train_split.coverage" NAME="train_split Coverage Results" MODIFIED="1777310051392" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/script" />
+    <SUITE FILE_PATH="coverage/Gradulate$eval_split.coverage" NAME="eval_split Coverage Results" MODIFIED="1777538875316" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/script" />
     <SUITE FILE_PATH="coverage/Gradulate$pyradiomic_test.coverage" NAME="pyradiomic_test Coverage Results" MODIFIED="1777313265945" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temp" />
+    <SUITE FILE_PATH="coverage/Gradulate$train_split.coverage" NAME="train_split Coverage Results" MODIFIED="1777563387823" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/script" />
   </component>
 </project>

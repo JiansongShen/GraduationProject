@@ -53,26 +53,23 @@ def combine_to_nifti(
     patch_d, patch_h, patch_w = patch_shape
     src_d, src_h, src_w = src_shape
     dtype = torch.uint8 if binarize else torch.float32
+    combined = torch.zeros(src_shape, dtype=dtype)
     patch_idx = 0
 
-    if not nifti_path:
-        raise ValueError("Cannot stitch eval prediction: nifti_path is not provided.")
+    # load the nifti file to check whether the patch list is compatible to combine one file
+    if nifti_path is None:
+        raise ValueError("Nifti path is required to combine patches.")
     src_img = sitk.ReadImage(nifti_path)
-    new_img = resample_in_memory(src_img)
-    img_size: VectorUInt32 = new_img.GetSize()
-    patches_size = len(patch_list)
-    combined = torch.zeros(new_img.GetSize(), dtype=dtype)
+    resampled_img = resample_in_memory(src_img)
+    resampled_img_d, resampled_img_h, resampled_img_w = resampled_img.GetSize()
 
-    (img_z, img_y, img_x) = img_size
-    print(f"img_size: {img_size}")
-    print(f"patch_shape: {patch_shape}")
-    # check if the patches match the expected shape
-    expected_patch_size: int = ((img_z + patch_d - 1) // patch_d) * ((img_y + patch_h - 1) // patch_h) * (
-    (img_x + patch_w - 1) // patch_w)
-    if patches_size != expected_patch_size:
-        raise ValueError(
-            f"the input patches have size: {patches_size}, but need {expected_patch_size}"
-        )
+    expect_patches_size: int = (
+            ((resampled_img_d + patch_d - 1) // patch_d)
+            * ((resampled_img_h + patch_h - 1) // patch_h)
+            * ((resampled_img_w + patch_w - 1) // patch_w))
+
+    if expect_patches_size != len(patch_list):
+        raise ValueError(f"Invalid patch list size: {len(patch_list)}, expected {expect_patches_size}")
 
     for z in range(0, src_d, patch_d):
         for y in range(0, src_h, patch_h):
@@ -92,18 +89,13 @@ def combine_to_nifti(
                 y_end = min(y + patch_h, src_h)
                 x_end = min(x + patch_w, src_w)
 
-                patch_z = patch_h_z = patch_w_x = 0
+                # Calculate the actual size needed for this patch
+                actual_patch_d = z_end - z
+                actual_patch_h = y_end - y
+                actual_patch_w = x_end - x
 
-                # Extract the part of the patch that fits in the destination
-                if z + patch_d > src_d:
-                    patch_z = patch_d - (z + patch_d - src_d)
-                if y + patch_h > src_h:
-                    patch_h_z = patch_h - (y + patch_h - src_h)
-                if x + patch_w > src_w:
-                    patch_w_x = patch_w - (x + patch_w - src_w)
-
-                # Copy the appropriate slice of the patch
-                actual_patch = patch[:patch_z or patch_d, :patch_h_z or patch_h, :patch_w_x or patch_w]
+                # Extract the appropriate slice of the patch to fit in the destination
+                actual_patch = patch[:actual_patch_d, :actual_patch_h, :actual_patch_w]
 
                 if binarize:
                     combined[z:z_end, y:y_end, x:x_end] = (actual_patch > 0.5).to(torch.uint8)
@@ -113,7 +105,6 @@ def combine_to_nifti(
                 patch_idx += 1
 
     image = sitk.GetImageFromArray(combined.numpy())
-    image = resample_in_memory(image, src_img.GetSpacing())
     return sitk.Cast(image, sitk.sitkUInt8) if binarize else image
 
 
@@ -214,7 +205,7 @@ def evaluate(
             )
 
         if store_single_res and sample_idx == 0 and prediction_dir is not None:
-            src_shape_tuple : tuple[int, int, int] = image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2]
+            src_shape_tuple: tuple[int, int, int] = image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2]
             if len(src_shape_tuple) != 3:
                 raise ValueError(f"Invalid eval source shape: {src_shape_tuple}")
             prediction_dir.mkdir(parents=True, exist_ok=True)
@@ -223,7 +214,6 @@ def evaluate(
                                                      nifti_path=dataset.get_src_label_path(sample_idx))
 
                 # Restore original spacing to the reconstructed image
-                probability_nifti.SetSpacing(original_spacing)
                 probability_nifti.SetDirection(original_direction)
                 probability_nifti.SetOrigin(original_origin)
 

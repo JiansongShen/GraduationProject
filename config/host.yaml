@@ -34,7 +34,7 @@ data:
   patches_per_volume: 4
   patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
   background_per_foreground: 2
-  max_load: 1
+  max_load: 10
 
 async_load:
   ram_cache_gb: 8.0

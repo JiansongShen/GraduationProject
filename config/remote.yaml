@@ -45,14 +45,14 @@ data:
   prefetch_factor: 4
   file_patterns:
     - "*_origin.nii.gz"
-    # - "*_brainpre.nii.gz"
   label_suffix:
     - "_label.nii.gz"
+    - "_ias.nii.gz"
   train_ratio: 0.8
   patches_per_volume: 64
   patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
   background_per_foreground: 2
-  max_load: 10
+  max_load: 1000
 
 async_load:
   ram_cache_gb: 30.0
