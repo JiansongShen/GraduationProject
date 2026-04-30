@@ -2,8 +2,8 @@ model:
   name: "unet"
   in_channels: 1
   out_channels: 1
-  base_filters: 32
-  depth: 4
+  base_filters: 8
+  depth: 2
 
 train:
   epochs: 50
@@ -19,10 +19,10 @@ train:
 data:
   train_dirs:
     - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
-    - "/home/napbad/project/graduate_proj/core_model/dataset/MultiCrop"
+    # - "/home/napbad/project/graduate_proj/core_model/dataset/MultiCrop"
   eval_dirs:
-    - "/home/napbad/project/graduate_proj/core_model/dataset/Single"
-    - "/home/napbad/project/graduate_proj/core_model/dataset/Multi"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
+    # - "/home/napbad/project/graduate_proj/core_model/dataset/Multi"
   num_workers: 2
   prefetch_factor: 2
   file_patterns:
@@ -30,6 +30,9 @@ data:
     - "*_brainpre.nii.gz"
   label_suffix: "_label.nii.gz"
   train_ratio: 0.8
+  patches_per_volume: 4
+  patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
+  background_per_foreground: 2    
 
 async_load:
   ram_cache_gb: 8.0
@@ -60,17 +63,17 @@ risk:
   dummy_num_rows: 512
   metadata_columns: ["年龄", "性别", "部位"]
   num_heads: 4
-  hidden_dim: 64
-  num_layers: 2
+  hidden_dim: 128
+  num_layers: 5
   dropout: 0.1
-  epochs: 50
+  epochs: 5000
   batch_size: 64
   learning_rate: 1.0e-3
   weight_decay: 1.0e-4
   test_size: 0.2
   val_size: 0.1
   random_state: 42
-  auto_max_features: 64
+  auto_max_features: 300
   feature_select_method: "mutual_info"
   categorical_min_frequency: 5
   use_pyradiomics_overlap_only: true
@@ -86,4 +89,4 @@ risk:
 device: "cuda"
 seed: 42
 log_dir: "logs"
-eval_interval: 5
+eval_interval: 1

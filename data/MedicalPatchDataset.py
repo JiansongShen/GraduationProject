@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import random
 from dataclasses import dataclass
@@ -183,15 +184,25 @@ class MedicalPatchDataset(TorchDataset):
         return len(self.cases)
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor | None]:
-        """Load one volume and sequentially traverse it into patches.
+        """Load one volume and select patches with the configured sampling mode.
 
         `patches_per_volume` is a maximum cap, not a required sampling count.
-        The method walks through the volume in z/y/x order and stops immediately
-        when either the full volume has been traversed or the cap is reached.
 
         Shapes:
         - images: [P, C, D, H, W]
         - labels: [P, D, H, W] or None
+        """
+        return self.get_patches(index, sampling_mode=self.patch_sampling_mode)
+
+    def get_patches(
+        self,
+        index: int,
+        sampling_mode: str | None = None,
+    ) -> tuple[Tensor, Tensor | None]:
+        """Load one volume and return patches with an explicit sampling mode.
+
+        Evaluation should call this with `sampling_mode="sequential"` so the saved
+        prediction volume is stitched with the same deterministic z/y/x order.
         """
         if len(self.cases) == 0:
             raise IndexError("Dataset is empty.")
@@ -206,7 +217,7 @@ class MedicalPatchDataset(TorchDataset):
         if label is not None:
             label = self._pad_to_minimum_patch_shape(label)
 
-        selected_starts = self._select_patch_starts(image, label)
+        selected_starts = self._select_patch_starts(image, label, sampling_mode=sampling_mode)
         image_patches: list[Tensor] = []
         label_patches: list[Tensor] = []
         for z, y, x in selected_starts:
@@ -243,13 +254,20 @@ class MedicalPatchDataset(TorchDataset):
         return bool((patch_label > 0).any())
 
     def _select_patch_starts(
-        self, image: np.ndarray, label: Optional[np.ndarray]
+        self,
+        image: np.ndarray,
+        label: Optional[np.ndarray],
+        sampling_mode: str | None = None,
     ) -> list[tuple[int, int, int]]:
         starts = self._iter_patch_starts(image.shape)
         if not starts:
             return []
 
-        if label is None or self.patch_sampling_mode == "sequential":
+        mode = (sampling_mode or self.patch_sampling_mode).lower()
+        if mode not in {"sequential", "foreground_priority", "foreground_only"}:
+            raise ValueError(f"Unsupported patch_sampling_mode: {mode}")
+
+        if label is None or mode == "sequential":
             return starts[: self.patches_per_volume]
 
         foreground_starts: list[tuple[int, int, int]] = []
@@ -260,7 +278,7 @@ class MedicalPatchDataset(TorchDataset):
             else:
                 background_starts.append(start)
 
-        if self.patch_sampling_mode == "foreground_only":
+        if mode == "foreground_only":
             if not foreground_starts:
                 logging.warning(
                     "No foreground patches found in case, falling back to sequential sampling for one case."
@@ -268,7 +286,7 @@ class MedicalPatchDataset(TorchDataset):
                 return starts[: self.patches_per_volume]
             return foreground_starts[: self.patches_per_volume]
 
-        if self.patch_sampling_mode == "foreground_priority":
+        if mode == "foreground_priority":
             if not foreground_starts:
                 logging.warning(
                     "No foreground patches found in case, falling back to sequential sampling for one case."

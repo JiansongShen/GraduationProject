@@ -106,6 +106,10 @@ class RiskConfig:
     auto_max_features: int = 64
     feature_select_method: str = "mutual_info"
     categorical_min_frequency: int = 5
+    use_pos_weight: bool = True
+    early_stopping_patience: int = 10000
+    early_stopping_min_delta: float = 1e-4
+    threshold_search_steps: int = 19
     use_pyradiomics_overlap_only: bool = True
     clinic_columns: list[str] = field(
         default_factory=lambda: ["性别", "年龄", "高血压", "心脏病", "糖尿病", "脑血管硬化", "饮酒", "抽烟", "出血史"]

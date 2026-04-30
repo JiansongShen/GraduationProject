@@ -1,7 +1,0 @@
-2026-04-25 12:57:00,082 - INFO - Building risk data bundle...
-2026-04-25 12:57:00,092 - INFO - Risk dataset sizes | train=357 val=52 test=103 | numeric=4 categorical=2
-2026-04-25 12:57:00,096 - INFO - Risk model params: 213509
-2026-04-25 12:57:01,474 - INFO - Epoch 1/1 | train loss=0.6385 acc=0.6083 f1=0.6866 | val loss=0.7067 acc=0.5219 f1=0.6215
-2026-04-25 12:57:01,484 - INFO - Final test | loss=0.4882 acc=0.8672 f1=0.8952
-2026-04-25 12:57:01,487 - INFO - Saved risk model to checkpoints/risk/risk_cross_attention.pt
-2026-04-25 12:57:01,487 - INFO - Saved risk report to checkpoints/risk/risk_report.json

@@ -12,7 +12,6 @@ import numpy as np
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
-import SimpleITK as sitk
 
 # Add project root to path
 project_root = Path(__file__).resolve().parent.parent
@@ -133,42 +132,6 @@ def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor
     return target
 
 
-def combine_to_nifti(patch_list: list[torch.Tensor], patch_shape: tuple[int, int, int], src_shape: tuple[int, int, int]) -> sitk.Image:
-    """Stitch sequentially traversed prediction patches back into a volume.
-
-    The patch order must match `MedicalPatchDataset.__getitem__`: z -> y -> x,
-    non-overlapping full patches only. Because `patches_per_volume` is a cap, the
-    stitched result may cover only the first part of the source volume; uncovered
-    voxels remain zero.
-    """
-    if not patch_list:
-        raise ValueError("Cannot stitch prediction result: patch_list is empty.")
-
-    patch_d, patch_h, patch_w = patch_shape
-    src_d, src_h, src_w = src_shape
-    combined = torch.zeros(src_shape, dtype=torch.float32)
-    patch_idx = 0
-
-    for z in range(0, src_d - patch_d + 1, patch_d):
-        for y in range(0, src_h - patch_h + 1, patch_h):
-            for x in range(0, src_w - patch_w + 1, patch_w):
-                if patch_idx >= len(patch_list):
-                    return sitk.GetImageFromArray(combined.numpy())
-
-                patch = patch_list[patch_idx].detach().cpu()
-                if patch.ndim == 5:
-                    patch = patch[0, 0]
-                elif patch.ndim == 4:
-                    patch = patch[0]
-                if tuple(patch.shape) != patch_shape:
-                    raise ValueError(f"Invalid prediction patch shape: {tuple(patch.shape)}, expected {patch_shape}")
-
-                combined[z:z + patch_d, y:y + patch_h, x:x + patch_w] = patch.float()
-                patch_idx += 1
-
-    return sitk.GetImageFromArray(combined.numpy())
-
-
 def train_one_epoch(
     model: torch.nn.Module,
     dataset: MedicalPatchDataset,
@@ -176,9 +139,7 @@ def train_one_epoch(
     device: torch.device,
     epoch: int,
     writer: SummaryWriter,
-    prediction_dir: Path,
     cfg: Config,
-    store_single_res: bool = True,
 ) -> float:
     """Train for one epoch by loading one case at a time."""
     model.train()
@@ -190,9 +151,7 @@ def train_one_epoch(
 
     for batch_idx in range(total_volumes):
         logging.info("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
-        _, label_src = dataset.get_src_item(batch_idx)
         images, labels = dataset[batch_idx]
-        patch_list: list[torch.Tensor] = []
 
         if labels is None:
             logging.warning("Epoch %s volume %s/%s has no labels. Skipping.", epoch + 1, batch_idx + 1, total_volumes)
@@ -225,9 +184,6 @@ def train_one_epoch(
             loss.backward()
             optimizer.step()
 
-            if store_single_res and batch_idx == 0:
-                patch_list.append(outputs.detach().cpu())
-
             epoch_loss += loss.item()
             num_batches += 1
             avg_loss = epoch_loss / num_batches
@@ -245,18 +201,6 @@ def train_one_epoch(
 
             if num_batches % 10 == 0:
                 writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
-
-        if store_single_res and batch_idx == 0:
-            src_shape_tuple = tuple(int(dim) for dim in label_src.shape)
-            if len(src_shape_tuple) != 3:
-                raise ValueError(f"Invalid source shape: {src_shape_tuple}")
-            prediction_dir.mkdir(parents=True, exist_ok=True)
-            # Note: combine_to_nifti expects sequential non-overlapping patches. 
-            # If batch_size > 1, patch_list order is still sequential per volume.
-            nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple)
-            prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{batch_idx:04d}_prediction.nii.gz"
-            sitk.WriteImage(nifti, str(prediction_path))
-            logging.info("Saved sample prediction to %s", prediction_path)
 
     return epoch_loss / max(num_batches, 1)
 
@@ -407,9 +351,7 @@ def main() -> None:
             device,
             epoch,
             writer,
-            prediction_dir=prediction_dir,
-            cfg=cfg,  # Pass the config
-            store_single_res=True,
+            cfg=cfg,
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
         

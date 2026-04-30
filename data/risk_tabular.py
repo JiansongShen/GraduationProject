@@ -118,7 +118,7 @@ def extract_pyradiomics_features_from_predict_res_and_src(
         binWidth=25.0,
         resampledPixelSpacing=None,
         interpolator=sitk.sitkBSpline,
-        verbose=False,
+        verbose=True,
     )
     extractor.enableImageTypes(
         Original={},
@@ -131,13 +131,7 @@ def extract_pyradiomics_features_from_predict_res_and_src(
     )
     extractor.enableAllFeatures()
     result = extractor.execute(image, mask)
-    numeric_features: dict[str, float] = {}
-    for key, value in result.items():
-        if key.startswith("diagnostics_"):
-            continue
-        if isinstance(value, (int, float, np.number)):
-            numeric_features[key] = float(value)
-    return numeric_features
+    return result
 
 
 def _resolve_saved_data_paths(cfg: RiskConfig) -> tuple[Path | None, Path | None]:
@@ -169,6 +163,7 @@ def _select_overlap_and_clinic_columns(raw_df: pd.DataFrame, cfg: RiskConfig) ->
                 predict_res_path=str(predict_res_path),
                 src_path=str(src_path),
             )
+            logger.info("Extracted %d pyradiomics features", len(pyradiomics_features))
             overlap_columns = [col for col in raw_df.columns if col in pyradiomics_features]
             logger.info(
                 "Selected %d overlapped pyradiomics columns from %s and %s.",
@@ -184,13 +179,34 @@ def _select_overlap_and_clinic_columns(raw_df: pd.DataFrame, cfg: RiskConfig) ->
     clinic_columns = cfg.clinic_columns or DEFAULT_CLINIC_COLUMNS
     clinic_present = [col for col in clinic_columns if col in raw_df.columns]
     selected = overlap_columns + [col for col in clinic_present if col not in overlap_columns]
+    logger.info("Selected %d columns", len(selected))
     required_columns = [cfg.id_column, cfg.label_column]
     selected += [col for col in required_columns if col in raw_df.columns and col not in selected]
 
     if not selected:
         logger.warning("No overlap/clinic columns selected, falling back to original dataframe.")
         return raw_df
-    return raw_df[selected].copy()
+    selected_df = raw_df[selected].copy()
+
+    # Overlap columns are expected to be pyradiomics-style numeric features.
+    # Coerce first, then drop overlap columns that cannot be converted at all.
+    dropped_overlap_columns: list[str] = []
+    for col in overlap_columns:
+        if col not in selected_df.columns:
+            continue
+        as_numeric = pd.to_numeric(selected_df[col], errors="coerce")
+        if as_numeric.notna().any():
+            selected_df[col] = as_numeric
+        else:
+            selected_df = selected_df.drop(columns=[col])
+            dropped_overlap_columns.append(col)
+
+    if dropped_overlap_columns:
+        logger.warning(
+            "Dropped %d overlapped pyradiomics columns that could not be converted to numeric.",
+            len(dropped_overlap_columns),
+        )
+    return selected_df
 
 
 def _clean_dataframe(df: pd.DataFrame, cfg: RiskConfig) -> pd.DataFrame:
@@ -233,6 +249,33 @@ def _select_feature_columns(df: pd.DataFrame, cfg: RiskConfig) -> list[str]:
     return [col for col in df.columns if col not in ignore_columns]
 
 
+def _coerce_feature_columns_to_numeric_first(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+) -> tuple[pd.DataFrame, list[str]]:
+    """Try numeric coercion first and drop columns that are fully unparseable."""
+    if not feature_columns:
+        return df, feature_columns
+
+    updated_df = df.copy()
+    kept_columns: list[str] = []
+    dropped_columns: list[str] = []
+    for col in feature_columns:
+        as_numeric = pd.to_numeric(updated_df[col], errors="coerce")
+        if as_numeric.notna().any():
+            updated_df[col] = as_numeric
+            kept_columns.append(col)
+        else:
+            dropped_columns.append(col)
+
+    if dropped_columns:
+        logger.warning(
+            "Dropped %d feature columns that could not be converted to numeric at all.",
+            len(dropped_columns),
+        )
+    return updated_df, kept_columns
+
+
 def _split_numeric_and_categorical(df: pd.DataFrame, columns: list[str]) -> tuple[list[str], list[str]]:
     numeric_columns: list[str] = []
     categorical_columns: list[str] = []
@@ -270,6 +313,8 @@ def build_risk_data_bundle(cfg: RiskConfig) -> RiskDataBundle:
     y = (y > 0.0).astype(np.float32)
 
     all_feature_columns = _select_feature_columns(df, cfg)
+    if cfg.use_pyradiomics_overlap_only:
+        df, all_feature_columns = _coerce_feature_columns_to_numeric_first(df, all_feature_columns)
     numeric_columns, categorical_columns = _split_numeric_and_categorical(df, all_feature_columns)
 
     numeric_df = df[numeric_columns].copy() if numeric_columns else pd.DataFrame(index=df.index)

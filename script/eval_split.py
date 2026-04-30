@@ -11,6 +11,7 @@ from data.MedicalPatchDataset import MedicalPatchDataset
 
 
 def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
+    pred = torch.sigmoid(pred)
     pred_flat = pred.view(-1)
     target_flat = target.view(-1)
     intersection = (pred_flat * target_flat).sum()
@@ -19,6 +20,7 @@ def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) ->
 
 
 def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    pred = torch.sigmoid(pred)
     bce = torch.nn.functional.binary_cross_entropy(pred, target)
     dice = dice_loss(pred, target)
     return bce + dice
@@ -38,34 +40,39 @@ def combine_to_nifti(
     patch_list: list[torch.Tensor],
     patch_shape: tuple[int, int, int],
     src_shape: tuple[int, int, int],
+    binarize: bool = False,
 ) -> sitk.Image:
-    """Stitch sequential prediction patches back to one volume."""
+    """Stitch sequential prediction patches back to one probability or binary volume."""
     if not patch_list:
         raise ValueError("Cannot stitch eval prediction: patch_list is empty.")
 
     patch_d, patch_h, patch_w = patch_shape
     src_d, src_h, src_w = src_shape
-    combined = torch.zeros(src_shape, dtype=torch.float32)
+    dtype = torch.uint8 if binarize else torch.float32
+    combined = torch.zeros(src_shape, dtype=dtype)
     patch_idx = 0
 
     for z in range(0, src_d - patch_d + 1, patch_d):
         for y in range(0, src_h - patch_h + 1, patch_h):
             for x in range(0, src_w - patch_w + 1, patch_w):
                 if patch_idx >= len(patch_list):
-                    return sitk.GetImageFromArray(combined.numpy())
+                    image = sitk.GetImageFromArray(combined.numpy())
+                    return sitk.Cast(image, sitk.sitkUInt8) if binarize else image
 
                 patch = patch_list[patch_idx].detach().cpu()
-                if patch.ndim == 5:
-                    patch = patch[0, 0]
-                elif patch.ndim == 4:
+                while patch.ndim > 3:
                     patch = patch[0]
                 if tuple(patch.shape) != patch_shape:
                     raise ValueError(f"Invalid eval patch shape: {tuple(patch.shape)}, expected {patch_shape}")
 
-                combined[z:z + patch_d, y:y + patch_h, x:x + patch_w] = patch.float()
+                if binarize:
+                    combined[z:z + patch_d, y:y + patch_h, x:x + patch_w] = (patch > 0.5).to(torch.uint8)
+                else:
+                    combined[z:z + patch_d, y:y + patch_h, x:x + patch_w] = patch.float().clamp(0.0, 1.0)
                 patch_idx += 1
 
-    return sitk.GetImageFromArray(combined.numpy())
+    image = sitk.GetImageFromArray(combined.numpy())
+    return sitk.Cast(image, sitk.sitkUInt8) if binarize else image
 
 
 @torch.no_grad()
@@ -90,7 +97,7 @@ def evaluate(
     for sample_idx in range(total_volumes):
         logging.info("Epoch %s validation volume %s/%s loading", epoch + 1, sample_idx + 1, total_volumes)
         _, label_src = dataset.get_src_item(sample_idx)
-        images, labels = dataset[sample_idx]
+        images, labels = dataset.get_patches(sample_idx, sampling_mode="sequential")
         patch_list: list[torch.Tensor] = []
         if labels is None:
             logging.warning("Epoch %s validation volume %s/%s has no labels. Skipping.", epoch + 1, sample_idx + 1, total_volumes)
@@ -119,11 +126,15 @@ def evaluate(
             batch_labels = align_target_shape(outputs, batch_labels)
             loss = combined_loss(outputs, batch_labels)
 
-            # If storing single results and this is the first volume, store outputs
-            if store_single_res and sample_idx == 0:
-                patch_list.extend([output_tensor.unsqueeze(0) for output_tensor in outputs])
-
             pred_binary = (outputs > 0.5).float()
+            output_min = float(outputs.min().item())
+            output_max = float(outputs.max().item())
+            output_mean = float(outputs.mean().item())
+            output_positive_ratio = float(pred_binary.mean().item())
+            target_positive_ratio = float((batch_labels > 0.5).float().mean().item())
+            if store_single_res and sample_idx == 0:
+                patch_list.extend([patch.detach().cpu() for patch in outputs[:, 0]])
+
             dice = 1.0 - dice_loss(pred_binary, batch_labels)
 
             epoch_loss += loss.item()
@@ -133,7 +144,7 @@ def evaluate(
             avg_loss = epoch_loss / num_batches
             avg_dice = epoch_dice / num_batches
             logging.info(
-                "Epoch %s validation volume %s/%s patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f global_patch_step=%s",
+                "Epoch %s validation volume %s/%s sequential patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f pred_min=%.6f pred_max=%.6f pred_mean=%.6f pred_positive_ratio=%.6f target_positive_ratio=%.6f global_patch_step=%s",
                 epoch + 1,
                 sample_idx + 1,
                 total_volumes,
@@ -143,6 +154,11 @@ def evaluate(
                 dice.item(),
                 avg_loss,
                 avg_dice,
+                output_min,
+                output_max,
+                output_mean,
+                output_positive_ratio,
+                target_positive_ratio,
                 num_batches,
             )
 
@@ -151,14 +167,16 @@ def evaluate(
             if len(src_shape_tuple) != 3:
                 raise ValueError(f"Invalid eval source shape: {src_shape_tuple}")
             prediction_dir.mkdir(parents=True, exist_ok=True)
-            # Combine only the first batch of patches for visualization
             if patch_list:
-                # Take the first patch from the batch for visualization
-                first_patch = patch_list[0].squeeze(0).unsqueeze(0)  # Shape: [1, D, H, W]
-                nifti = combine_to_nifti([first_patch], dataset.patch_size, src_shape_tuple)
-                prediction_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_prediction.nii.gz"
-                sitk.WriteImage(nifti, str(prediction_path))
-                logging.info("Saved eval sample prediction to %s", prediction_path)
+                probability_nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple, binarize=False)
+                probability_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_probability.nii.gz"
+                sitk.WriteImage(probability_nifti, str(probability_path))
+
+                binary_nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple, binarize=True)
+                binary_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_binary.nii.gz"
+                sitk.WriteImage(binary_nifti, str(binary_path))
+                logging.info("Saved eval probability prediction to %s", probability_path)
+                logging.info("Saved eval binary prediction to %s", binary_path)
 
     avg_loss = epoch_loss / max(num_batches, 1)
     avg_dice = epoch_dice / max(num_batches, 1)
