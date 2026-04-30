@@ -48,8 +48,9 @@ class DataConfig:
     file_patterns: list[str] = field(
         default_factory=lambda: ["*_origin.nii.gz", "*_brainpre.nii.gz"]
     )
-    label_suffix: str = "_label.nii.gz"
+    label_suffix: str | list[str] = "_label.nii.gz"
     train_ratio: float = 0.8
+    max_load: int = 1000
 
 
 @dataclass

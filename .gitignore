@@ -110,3 +110,6 @@ uv.lock
 # Project specific
 *.yaml.bak
 *.yml.bak
+
+checkpoints
+temp

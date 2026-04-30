@@ -202,7 +202,7 @@ def _calculate_sphericity(volume_mm3: float, surface_area_mm2: float) -> float:
 
 
 def _calculate_compactness(volume_mm3: float, surface_area_mm2: float) -> float:
-    """Calculate compactness metric.
+    """Calculate compactness module.
 
     Compactness = V^(2/3) / A
     Higher values indicate more compact shapes.

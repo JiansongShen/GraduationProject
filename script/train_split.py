@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_model(cfg: Config, device: torch.device) -> AttentionUnet | Callable[[Any], Any] | Any:
+def build_model(cfg: Config, device: torch.device) -> AttentionUnet:
     """Build model based on configuration."""
     # Currently using AttentionUnet - can be extended to support multiple models
     logging.info(f"build a model: depth: {cfg.model.depth}")
@@ -68,10 +68,10 @@ def build_model(cfg: Config, device: torch.device) -> AttentionUnet | Callable[[
     model = model.to(device)
     
     # Optional: compile model for faster training (PyTorch 2.0+)
-    if cfg.compile.enabled and hasattr(torch, 'compile'):
-        logging.info(f"Compiling model with mode: {cfg.compile.mode}")
-        model = torch.compile(model, mode=cfg.compile.mode, fullgraph=cfg.compile.fullgraph)
-    
+    # if cfg.compile.enabled and hasattr(torch, 'compile'):
+    #     logging.info(f"Compiling model with mode: {cfg.compile.mode}")
+    #     model = torch.compile(model, mode=cfg.compile.mode, fullgraph=cfg.compile.fullgraph)
+    #
     return model
 
 
@@ -290,7 +290,7 @@ def main() -> None:
     
     # Build model
     logging.info("Building model...")
-    model = build_model(cfg, device)
+    model: torch.nn.Module = build_model(cfg, device)
     logging.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # Build optimizer and scheduler
@@ -315,6 +315,10 @@ def main() -> None:
             "No eval_dirs configured under data.eval_dirs; validation will reuse train_dirs."
         )
 
+    eval_data_cfg.patch_sampling_mode = "sequential"
+    eval_data_cfg.max_load = 10000
+    eval_data_cfg.patches_per_volume = 64
+
     val_dataset = MedicalPatchDataset(
         cfg=eval_data_cfg,
         patch_size=patch_size,
@@ -325,7 +329,7 @@ def main() -> None:
     logging.info(f"Validation samples: {len(val_dataset)}")
     
     # Setup TensorBoard
-    writer = SummaryWriter(log_dir=log_dir / "tensorboard")
+    writer = SummaryWriter(log_dir=(log_dir / "tensorboard").__str__())
     
     # Resume from checkpoint if specified
     start_epoch = 0

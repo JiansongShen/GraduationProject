@@ -12,7 +12,6 @@ import SimpleITK as sitk
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset as TorchDataset
-from triton.language import tensor
 
 from core.config import DataConfig
 from data.data_preprocesser import NiftiImage, resample_in_memory
@@ -96,6 +95,10 @@ class MedicalPatchDataset(TorchDataset):
         # Build the case list from the configured training directories.
         # Each image file is matched with its corresponding label file if present.
         self.cases: list[CaseRecord] = self._build_case_records(cfg.train_dirs)
+
+        if len(self.cases) > self.cfg.max_load:
+            self.cases = self.cases[: self.cfg.max_load]
+
         if not self.cases:
             raise ValueError("No training cases were found. Please check `train_dirs` and `file_patterns`.")
 
@@ -104,7 +107,8 @@ class MedicalPatchDataset(TorchDataset):
 
         The loader assumes a naming convention where an image file has a known suffix,
         for example `*_origin.nii.gz` or `*_brainpre.nii.gz`, and the label file can be
-        obtained by replacing that suffix with `cfg.label_suffix`.
+        obtained by replacing that suffix with one of `cfg.label_suffix` values. If
+        multiple label suffixes are configured, the first existing candidate is used.
         """
         records: list[CaseRecord] = []
         seen_images: set[str] = set()
@@ -118,23 +122,35 @@ class MedicalPatchDataset(TorchDataset):
                 seen_images.add(path)
 
                 label_path = self._infer_label_path(path)
-                if label_path is not None and not os.path.exists(label_path):
-                    label_path = None
-
                 records.append(CaseRecord(image_path=path, label_path=label_path))
 
         return records
 
-    def _infer_label_path(self, image_path: str) -> Optional[str]:
-        """Infer the label path from the image path.
+    def _label_suffixes(self) -> list[str]:
+        """Return label suffix candidates in configured priority order."""
+        suffixes = self.cfg.label_suffix
+        if isinstance(suffixes, str):
+            return [suffixes]
+        return list(suffixes)
 
-        This is a lightweight convention-based matcher. It keeps the implementation
-        simple and avoids loading the whole dataset into memory just to build pairs.
+    def _infer_label_path(self, image_path: str) -> Optional[str]:
+        """Infer the first existing label path from configured suffix candidates.
+
+        `data.label_suffix` supports either a single string or a list of strings.
+        When it is a list, candidates are tried in order and the first existing file
+        is selected.
         """
         for pattern in self.cfg.file_patterns:
-            suffix = pattern.replace("*", ""    )
-            if image_path.endswith(suffix):
-                return image_path[: -len(suffix)] + self.cfg.label_suffix
+            suffix = pattern.replace("*", "")
+            if not image_path.endswith(suffix):
+                continue
+
+            image_prefix = image_path[: -len(suffix)]
+            for label_suffix in self._label_suffixes():
+                candidate = image_prefix + label_suffix
+                if os.path.exists(candidate):
+                    return candidate
+            return None
         return None
 
     def _load_case(self, case: CaseRecord) -> tuple[np.ndarray, Optional[np.ndarray]]:
@@ -212,19 +228,14 @@ class MedicalPatchDataset(TorchDataset):
         image, label = self._load_case(case)
         image = _normalize_image(image)
 
-        patch_d, patch_h, patch_w = self.patch_size
-        image = self._pad_to_minimum_patch_shape(image)
-        if label is not None:
-            label = self._pad_to_minimum_patch_shape(label)
-
         selected_starts = self._select_patch_starts(image, label, sampling_mode=sampling_mode)
         image_patches: list[Tensor] = []
         label_patches: list[Tensor] = []
-        for z, y, x in selected_starts:
-            patch_image = image[z:z + patch_d, y:y + patch_h, x:x + patch_w]
+        for start in selected_starts:
+            patch_image = self._crop_patch(image, start)
             image_patches.append(torch.from_numpy(patch_image[None, ...].astype(np.float32)))
             if label is not None:
-                patch_label = label[z:z + patch_d, y:y + patch_h, x:x + patch_w]
+                patch_label = self._crop_patch(label, start)
                 label_patches.append(torch.from_numpy(patch_label.astype(np.int64)))
 
         if not image_patches:
@@ -241,9 +252,9 @@ class MedicalPatchDataset(TorchDataset):
         patch_d, patch_h, patch_w = self.patch_size
         image_d, image_h, image_w = image_shape
         starts: list[tuple[int, int, int]] = []
-        for z in range(0, image_d - patch_d + 1, patch_d):
-            for y in range(0, image_h - patch_h + 1, patch_h):
-                for x in range(0, image_w - patch_w + 1, patch_w):
+        for z in range(0, image_d, patch_d):
+            for y in range(0, image_h, patch_h):
+                for x in range(0, image_w, patch_w):
                     starts.append((z, y, x))
         return starts
 
@@ -400,6 +411,16 @@ class MedicalPatchDataset(TorchDataset):
         patch[dst_z0:dst_z1, dst_y0:dst_y1, dst_x0:dst_x1] = array[src_z0:src_z1, src_y0:src_y1, src_x0:src_x1]
         return patch
 
+    def _create_empty_patch(self, dtype) -> np.ndarray:
+        """Create an empty patch of patch_size filled with zeros."""
+        dz, dy, dx = self.patch_size
+        return np.zeros((dz, dy, dx), dtype=dtype)
+
     def get_src_item(self, batch_idx: int) -> tuple[Tensor, Tensor | None]:
         image, label = self._load_case(self.cases[batch_idx])
         return Tensor(image), Tensor(label) if label is not None else None
+
+    def get_src_label_path(self, batch_idx: int) -> Path:
+        if self.cases[batch_idx].label_path is None:
+            raise ValueError("Label path is None")
+        return Path(self.cases[batch_idx].label_path)
