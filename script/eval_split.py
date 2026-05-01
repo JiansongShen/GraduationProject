@@ -129,10 +129,10 @@ def evaluate(
     num_batches = 0
 
     total_volumes = len(dataset)
-    logging.info("Epoch %s validation started: total_volumes=%s", epoch + 1, total_volumes)
+    logging.debug("Epoch %s validation started: total_volumes=%s", epoch + 1, total_volumes)
 
     for sample_idx in range(total_volumes):
-        logging.info("Epoch %s validation volume %s/%s loading", epoch + 1, sample_idx + 1, total_volumes)
+        logging.debug("Epoch %s validation volume %s/%s loading", epoch + 1, sample_idx + 1, total_volumes)
 
         # Get original image for spacing restoration
         original_image_itk = sitk.ReadImage(dataset.cases[sample_idx].image_path)
@@ -150,7 +150,7 @@ def evaluate(
             continue
 
         patch_count = int(images.shape[0])
-        logging.info(
+        logging.debug(
             "Epoch %s validation volume %s/%s loaded: patches=%s image_shape=%s label_shape=%s",
             epoch + 1,
             sample_idx + 1,
@@ -189,7 +189,7 @@ def evaluate(
 
             avg_loss = epoch_loss / num_batches
             avg_dice = epoch_dice / num_batches
-            logging.info(
+            logging.debug(
                 "Epoch %s validation volume %s/%s sequential patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f pred_min=%.6f pred_max=%.6f pred_mean=%.6f pred_positive_ratio=%.6f target_positive_ratio=%.6f global_patch_step=%s",
                 epoch + 1,
                 sample_idx + 1,
@@ -222,7 +222,7 @@ def evaluate(
                 probability_nifti.SetDirection(original_direction)
                 probability_nifti.SetOrigin(original_origin)
 
-                probability_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{dataset.cases[sample_idx].image_path}_eval_probability.nii.gz"
+                probability_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{Path(dataset.cases[sample_idx].image_path).name}_eval_probability.nii.gz"
                 sitk.WriteImage(probability_nifti, str(probability_path))
 
                 binary_nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple, binarize=True,
@@ -233,7 +233,7 @@ def evaluate(
                 binary_nifti.SetDirection(original_direction)
                 binary_nifti.SetOrigin(original_origin)
 
-                binary_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{dataset.cases[sample_idx].image_path}_eval_binary.nii.gz"
+                binary_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{Path(dataset.cases[sample_idx].image_path).name}_eval_binary.nii.gz"
                 sitk.WriteImage(binary_nifti, str(binary_path))
                 logging.info("Saved eval probability prediction to %s", probability_path)
                 logging.info("Saved eval binary prediction to %s", binary_path)

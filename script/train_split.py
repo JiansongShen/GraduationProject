@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 # Add project root to path
 project_root = Path(__file__).resolve().parent.parent
@@ -147,10 +148,10 @@ def train_one_epoch(
     num_batches = 0
 
     total_volumes = len(dataset)
-    logging.info("Epoch %s training started: total_volumes=%s", epoch + 1, total_volumes)
+    logging.debug("Epoch %s training started: total_volumes=%s", epoch + 1, total_volumes)
 
     for batch_idx in range(total_volumes):
-        logging.info("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
+        logging.debug("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
         images, labels = dataset[batch_idx]
 
         if labels is None:
@@ -158,7 +159,7 @@ def train_one_epoch(
             continue
 
         patch_count = int(images.shape[0])
-        logging.info(
+        logging.debug(
             "Epoch %s volume %s/%s loaded: patches=%s image_shape=%s label_shape=%s",
             epoch + 1,
             batch_idx + 1,
@@ -187,7 +188,7 @@ def train_one_epoch(
             epoch_loss += loss.item()
             num_batches += 1
             avg_loss = epoch_loss / num_batches
-            logging.info(
+            logging.debug(
                 "Epoch %s volume %s/%s patch batch %s-%s done: loss=%.6f avg_loss=%.6f global_patch_step=%s",
                 epoch + 1,
                 batch_idx + 1,
@@ -257,6 +258,7 @@ def main() -> None:
     config_path = Path(args.config)
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
+
     
     cfg = load_config(config_path)
     
@@ -266,6 +268,7 @@ def main() -> None:
     
     # Initialize system settings (random seeds, etc.)
     SystemSetting.set_seed(cfg.seed)
+
     
     # Setup logging
     log_dir = Path(cfg.log_dir)
@@ -346,7 +349,9 @@ def main() -> None:
     checkpoint_dir = Path(cfg.checkpoint.save_dir)
     prediction_dir = checkpoint_dir / "predictions"
 
-    for epoch in range(start_epoch, cfg.train.epochs):
+    # progress bar
+    progress_bar = tqdm(range(start_epoch, cfg.train.epochs), desc="Training", initial=start_epoch, total=cfg.train.epochs)
+    for epoch in progress_bar:
         # Train
         train_loss = train_one_epoch(
             model,
