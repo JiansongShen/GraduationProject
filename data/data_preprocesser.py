@@ -39,5 +39,5 @@ def resample_in_memory(
     resampler.SetDefaultPixelValue(0)
 
     # 5. Execute and return the memory-resident object
-    logging.info(f"Resampling {image.GetSize()} to {new_size}...")
+    logging.debug(f"Resampling {image.GetSize()} to {new_size}...")
     return resampler.Execute(image)
