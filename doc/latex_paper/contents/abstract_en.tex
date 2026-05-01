@@ -1,0 +1,10 @@
+Intracranial aneurysm screening and rupture risk assessment are critical tasks in stroke prevention. Manual interpretation of CTA scans is labor-intensive and subject to inter-observer variability, especially for small lesions and complex vascular structures. To address this issue, this thesis develops an integrated framework for precise aneurysm detection and rupture risk prediction.\par
+
+For segmentation, a 3D Attention U-Net based pipeline is implemented with case-wise streaming, spacing normalization, foreground-priority patch sampling, and sequential patch stitching. The training objective combines Dice loss and binary cross-entropy, while the evaluation pipeline generates both probability maps and binary masks for downstream analysis.\par
+
+For risk prediction, a cross-attention model is designed to jointly encode numeric and categorical clinical features. The implementation includes robust tabular preprocessing, mutual-information-based feature selection, rare-category handling, class-imbalance-aware weighted loss, and validation threshold search for binary decision optimization.\par
+
+Experimental implementation demonstrates an end-to-end workflow from image segmentation to rupture risk classification, satisfying the project requirement of ``automatic localization/segmentation + intelligent risk prediction''. The delivered system provides a practical and extensible foundation for computer-aided diagnosis of intracranial aneurysms.\par
+
+~\\
+\hspace*{2em}\textbf{Key words}: intracranial aneurysm; medical image segmentation; Attention U-Net; cross-attention; rupture risk prediction\\

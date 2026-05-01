@@ -30,6 +30,7 @@ data:
     - "*_brainpre.nii.gz"
   label_suffix:
     - "_label.nii.gz"
+    - "_ias.nii.gz"
   train_ratio: 0.8
   patches_per_volume: 4
   patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"

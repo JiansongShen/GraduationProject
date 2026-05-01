@@ -1,0 +1,66 @@
+\section{系统实现与方法设计}
+
+\subsection{系统总体架构}
+本文实现的系统由两个核心任务组成：动脉瘤分割任务与破裂风险预测任务。整体流程如下：
+\begin{enumerate}
+	\item 输入CTA体数据，完成重采样与标准化；
+	\item 基于三维Attention U-Net进行病灶分割，输出概率图与二值掩膜；
+	\item 结合临床信息与可选影像组学/形态学特征，构建风险特征表；
+	\item 采用交叉注意力模型完成破裂风险二分类预测。
+\end{enumerate}
+
+该流程对应项目中两个训练脚本：\texttt{train\_split.py}负责分割模型训练，\texttt{train\_risk.py}负责风险模型训练，二者共享统一配置文件，便于实验管理与复现。
+
+\subsection{动脉瘤分割模块设计}
+\subsubsection{数据组织与流式补丁采样}
+三维医学影像体积大、显存占用高。为适应普通GPU环境，本文采用病例级流式加载策略：每次仅加载单个病例，在线完成预处理与补丁采样后立即释放。数据集模块支持以下机制：
+\begin{itemize}
+	\item 多目录扫描与图像-标签自动匹配（按后缀规则推断标签路径）；
+	\item 体素间距重采样，统一到目标 spacing；
+	\item z-score标准化；
+	\item 前景优先、仅前景、顺序遍历三种补丁采样模式。
+\end{itemize}
+
+对训练样本不平衡问题，采用“前景补丁+背景补丁配比”策略，使模型在关注病灶区域的同时保留背景判别能力。补丁大小由配置指定，默认使用三维立方体补丁。
+
+\subsubsection{网络结构}
+分割模型基于Attention U-Net思想\cite{attention_unet}实现，主体由编码器、瓶颈层和解码器组成。编码端逐层提取高语义特征，解码端通过跳跃连接融合浅层空间细节。与标准U-Net相比，注意力门控能够抑制无关背景响应，提升小病灶区域的有效特征利用率。
+
+\subsubsection{损失函数与训练策略}
+训练目标采用二元交叉熵与Dice损失联合形式：
+\begin{equation}
+\mathcal{L}_{seg} = \mathcal{L}_{BCE} + \mathcal{L}_{Dice},
+\end{equation}
+其中Dice损失定义为：
+\begin{equation}
+\mathcal{L}_{Dice}=1-\frac{2\sum_{i}p_i g_i+\epsilon}{\sum_i p_i+\sum_i g_i+\epsilon},
+\end{equation}
+$p_i$表示预测值，$g_i$表示真实标签，$\epsilon$为平滑项。该损失兼顾像素级稳定优化与区域重叠度优化，对前景占比较低的任务更友好。
+
+优化器支持Adam、AdamW与SGD，默认采用Adam。训练过程中记录批次损失与轮次损失，并定期保存`latest`与`best`检查点。
+
+\subsubsection{评估与结果重建}
+评估阶段使用顺序补丁采样对整例进行推理，再将补丁结果按空间位置拼接为完整体数据。系统同时保存概率图和阈值化掩膜，并恢复原始图像的 spacing、origin 与 direction，确保结果可直接用于后续临床可视化或特征提取。
+
+\subsection{破裂风险预测模块设计}
+\subsubsection{表格数据预处理}
+风险预测输入包含临床变量、可选影像组学特征及可选分割后形态学特征。预处理流程包括：
+\begin{itemize}
+	\item 缺失列检查、重复样本去除、字段清洗；
+	\item 数值列中位数填补与标准化；
+	\item 类别列低频值合并与整数编码；
+	\item 互信息特征筛选，控制高维数值特征规模。
+\end{itemize}
+
+当启用“影像组学重叠列”模式时，系统会依据已分割结果自动提取可用组学字段并与临床字段合并，减少无效特征引入。
+
+\subsubsection{交叉注意力风险模型}
+风险模型采用“数值特征流+类别特征流”的双流表示。数值特征先映射为token序列，类别特征经嵌入层编码后形成另一组token，随后执行多层双向交叉注意力：
+\begin{equation}
+\mathbf{Z}_{num}^{l+1}=Attn(\mathbf{Z}_{num}^{l},\mathbf{Z}_{cat}^{l}),\quad
+\mathbf{Z}_{cat}^{l+1}=Attn(\mathbf{Z}_{cat}^{l},\mathbf{Z}_{num}^{l}).
+\end{equation}
+最终对两路token池化并拼接，经全连接头输出破裂概率。该结构能够显式建模“临床变量-类别属性”之间的交互关系。
+
+\subsubsection{训练与阈值优化}
+风险任务使用加权二元交叉熵损失，对类别不平衡进行修正。训练中按验证集F1进行阈值网格搜索，动态更新分类阈值；并采用基于验证损失的早停机制控制过拟合。最终在测试集报告准确率、F1和AUC等指标，输出模型权重与JSON格式评估报告。

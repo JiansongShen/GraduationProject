@@ -8,7 +8,7 @@ NiftiImage = sitk.Image
 
 def resample_in_memory(
         image: NiftiImage,
-        target_spacing: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+        target_spacing: Tuple[float, float, float] = (1, 1, 1),
         is_mask: bool = False
 ) -> NiftiImage:
     """

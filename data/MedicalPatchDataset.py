@@ -424,3 +424,23 @@ class MedicalPatchDataset(TorchDataset):
         if self.cases[batch_idx].label_path is None:
             raise ValueError("Label path is None")
         return Path(self.cases[batch_idx].label_path)
+
+
+    def estimate_new_shape(old_shape: tuple[int, int, int], old_spacing: tuple[float, float, float], new_spacing: tuple[float, float, float]) -> tuple[int, int, int]:
+        old_shape = np.array(old_shape)
+        old_spacing = np.array(old_spacing)
+        new_spacing = np.array(new_spacing)
+        new_shape = np.round(old_shape * old_spacing / new_spacing).astype(int)
+        return new_shape
+
+    def estimate_volume_memory_mb(self, shape: tuple[int, int, int], dtype=np.float32) -> float:
+        bytes_per_voxel = np.dtype(dtype).itemsize
+        total_bytes = np.prod(shape) * bytes_per_voxel
+        return total_bytes / 1024 / 1024
+
+    def ensure_can_load_case(self, batch_idx: int) -> bool:
+        if batch_idx >= len(self.cases):
+            return False
+        if self.estimate_volume_memory_mb(self.cases[batch_idx].image_shape) > 24000:
+            return False
+        return True

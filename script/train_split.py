@@ -152,6 +152,10 @@ def train_one_epoch(
 
     for batch_idx in range(total_volumes):
         logging.debug("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
+        
+        # if !dataset.ensure_can_load_case(batch_idx):
+        #     continue
+
         images, labels = dataset[batch_idx]
 
         if labels is None:
