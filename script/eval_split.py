@@ -36,6 +36,10 @@ def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor
         raise ValueError(
             f"Prediction/target shape mismatch after alignment: pred={tuple(pred.shape)}, target={tuple(target.shape)}"
         )
+    
+    # Ensure target values are in the range [0, 1] for binary cross-entropy
+    target = torch.clamp(target.float(), 0.0, 1.0)
+    
     return target
 
 
