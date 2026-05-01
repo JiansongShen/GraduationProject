@@ -218,10 +218,11 @@ def evaluate(
                                                      nifti_path=dataset.get_src_label_path(sample_idx))
 
                 # Restore original spacing to the reconstructed image
+                probability_nifti.SetSpacing(original_spacing)
                 probability_nifti.SetDirection(original_direction)
                 probability_nifti.SetOrigin(original_origin)
 
-                probability_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_probability.nii.gz"
+                probability_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{dataset.cases[sample_idx].image_path}_eval_probability.nii.gz"
                 sitk.WriteImage(probability_nifti, str(probability_path))
 
                 binary_nifti = combine_to_nifti(patch_list, dataset.patch_size, src_shape_tuple, binarize=True,
@@ -232,7 +233,7 @@ def evaluate(
                 binary_nifti.SetDirection(original_direction)
                 binary_nifti.SetOrigin(original_origin)
 
-                binary_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{sample_idx:04d}_eval_binary.nii.gz"
+                binary_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{dataset.cases[sample_idx].image_path}_eval_binary.nii.gz"
                 sitk.WriteImage(binary_nifti, str(binary_path))
                 logging.info("Saved eval probability prediction to %s", probability_path)
                 logging.info("Saved eval binary prediction to %s", binary_path)
