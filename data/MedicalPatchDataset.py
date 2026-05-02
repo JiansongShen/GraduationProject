@@ -73,7 +73,7 @@ class MedicalPatchDataset(TorchDataset):
         self,
         cfg: DataConfig,
         patch_size: tuple[int, int, int] = (128, 128, 128),
-        target_spacing: tuple[float, float, float] = (0.5, 0.5, 0.5),
+        target_spacing: tuple[float, float, float] = (1, 1, 1),
         foreground_sampling_prob: float = 0.5,
         seed: int = 42,
     ):
