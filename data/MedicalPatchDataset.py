@@ -70,12 +70,12 @@ class MedicalPatchDataset(TorchDataset):
     """
 
     def __init__(
-        self,
-        cfg: DataConfig,
-        patch_size: tuple[int, int, int] = (128, 128, 128),
-        target_spacing: tuple[float, float, float] = (1, 1, 1),
-        foreground_sampling_prob: float = 0.5,
-        seed: int = 42,
+            self,
+            cfg: DataConfig,
+            patch_size: tuple[int, int, int] = (128, 128, 128),
+            target_spacing: tuple[float, float, float] = (1, 1, 1),
+            foreground_sampling_prob: float = 0.5,
+            seed: int = 42,
     ):
         self.cfg = cfg
         self.patch_size = patch_size
@@ -161,8 +161,12 @@ class MedicalPatchDataset(TorchDataset):
         training because it stabilizes the physical receptive field across scans.
         """
         image_itk: NiftiImage = sitk.ReadImage(case.image_path)
+        img_shape = image_itk.GetSize()
+        logging.debug(f"load_case, load img with shape: {img_shape}, path: {case.image_path}")
         image_itk = resample_in_memory(image_itk, self.target_spacing, is_mask=False)
+        img_shape = image_itk.GetSize()
         image_np = sitk.GetArrayFromImage(image_itk).astype(np.float32)
+
 
         label_np: Optional[np.ndarray] = None
         if case.label_path is not None:
@@ -173,9 +177,9 @@ class MedicalPatchDataset(TorchDataset):
         return image_np, label_np
 
     def _sample_single_patch(
-        self,
-        image: np.ndarray,
-        label: Optional[np.ndarray],
+            self,
+            image: np.ndarray,
+            label: Optional[np.ndarray],
     ) -> tuple[Tensor, Tensor | None]:
         """Sample one spatial patch from the current case.
 
@@ -211,9 +215,9 @@ class MedicalPatchDataset(TorchDataset):
         return self.get_patches(index, sampling_mode=self.patch_sampling_mode)
 
     def get_patches(
-        self,
-        index: int,
-        sampling_mode: str | None = None,
+            self,
+            index: int,
+            sampling_mode: str | None = None,
     ) -> tuple[Tensor, Tensor | None]:
         """Load one volume and return patches with an explicit sampling mode.
 
@@ -227,8 +231,12 @@ class MedicalPatchDataset(TorchDataset):
         case = self.cases[case_index]
         image, label = self._load_case(case)
         image = _normalize_image(image)
+        patches_per_vol: int = 1000
+        if sampling_mode == 'sequential':
+            patches_per_vol = 1000
 
-        selected_starts = self._select_patch_starts(image, label, sampling_mode=sampling_mode)
+        selected_starts = self._select_patch_starts(image, label, sampling_mode=sampling_mode,
+                                                    patches_per_vol_input=patches_per_vol)
         image_patches: list[Tensor] = []
         label_patches: list[Tensor] = []
         for start in selected_starts:
@@ -265,10 +273,11 @@ class MedicalPatchDataset(TorchDataset):
         return bool((patch_label > 0).any())
 
     def _select_patch_starts(
-        self,
-        image: np.ndarray,
-        label: Optional[np.ndarray],
-        sampling_mode: str | None = None,
+            self,
+            image: np.ndarray,
+            label: Optional[np.ndarray],
+            sampling_mode: str | None = None,
+            patches_per_vol_input: int | None = None,
     ) -> list[tuple[int, int, int]]:
         starts = self._iter_patch_starts(image.shape)
         if not starts:
@@ -279,7 +288,7 @@ class MedicalPatchDataset(TorchDataset):
             raise ValueError(f"Unsupported patch_sampling_mode: {mode}")
 
         if label is None or mode == "sequential":
-            return starts[: self.patches_per_volume]
+            return starts[: patches_per_vol_input if patches_per_vol_input is not None else self.patches_per_volume]
 
         foreground_starts: list[tuple[int, int, int]] = []
         background_starts: list[tuple[int, int, int]] = []
@@ -334,7 +343,7 @@ class MedicalPatchDataset(TorchDataset):
                         selected.append(bg_start)
             return selected
 
-        return starts[: self.patches_per_volume]
+        return starts[: self.patches_per_volume if patches_per_vol_input is None else patches_per_vol_input]
 
     def _pad_to_minimum_patch_shape(self, array: np.ndarray) -> np.ndarray:
         """Pad a volume so every dimension can yield at least one full patch."""
@@ -346,7 +355,8 @@ class MedicalPatchDataset(TorchDataset):
             return array
         return np.pad(array, tuple(pad_width), mode="constant", constant_values=0)
 
-    def _choose_patch_start(self, image_shape: tuple[int, int, int], label: Optional[np.ndarray]) -> tuple[int, int, int]:
+    def _choose_patch_start(self, image_shape: tuple[int, int, int], label: Optional[np.ndarray]) -> tuple[
+        int, int, int]:
         """Choose the top-left-front corner of a patch.
 
         When foreground labels exist, we sample around foreground voxels with a
@@ -425,8 +435,8 @@ class MedicalPatchDataset(TorchDataset):
             raise ValueError("Label path is None")
         return Path(self.cases[batch_idx].label_path)
 
-
-    def estimate_new_shape(old_shape: tuple[int, int, int], old_spacing: tuple[float, float, float], new_spacing: tuple[float, float, float]) -> tuple[int, int, int]:
+    def estimate_new_shape(old_shape: tuple[int, int, int], old_spacing: tuple[float, float, float],
+                           new_spacing: tuple[float, float, float]) -> tuple[int, int, int]:
         old_shape = np.array(old_shape)
         old_spacing = np.array(old_spacing)
         new_spacing = np.array(new_spacing)

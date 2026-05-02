@@ -8,7 +8,7 @@ model:
 train:
   epochs: 50
   batch_size: 1
-  learning_rate: 1.0e-4
+  learning_rate: 1.0e-2
   weight_decay: 1.0e-5
   patch_size: [128, 128, 128]
   max_patches_per_volume: 64
@@ -92,4 +92,4 @@ risk:
 device: "cuda"
 seed: 42
 log_dir: "logs"
-eval_interval: 1
+eval_interval: 5

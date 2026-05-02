@@ -37,7 +37,8 @@ def resample_in_memory(
     resampler.SetTransform(sitk.Transform())
     resampler.SetInterpolator(interpolator)
     resampler.SetDefaultPixelValue(0)
+    new_img : NiftiImage = resampler.Execute(image)
 
     # 5. Execute and return the memory-resident object
-    logging.debug(f"Resampling {image.GetSize()} to {new_size}...")
-    return resampler.Execute(image)
+    logging.debug(f"Resampling {image.GetSize()} to {new_img.GetSize()}...")
+    return new_img

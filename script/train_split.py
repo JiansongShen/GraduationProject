@@ -5,6 +5,7 @@ import argparse
 import dataclasses
 import logging
 import sys
+from logging import DEBUG
 from pathlib import Path
 from typing import Any, Callable
 
@@ -214,6 +215,13 @@ def train_one_epoch(
                 device=device,
                 batch_size=max(1, cfg.train.batch_size),
             )
+            logging.debug(
+                "training preview case=%s patch_count=%s src_shape=%s spacing=%s",
+                case_path.name,
+                len(probability_patches),
+                src_shape,
+                spacing,
+            )
             probability_nifti = combine_to_nifti(
                 probability_patches,
                 dataset.patch_size,
@@ -221,9 +229,14 @@ def train_one_epoch(
                 binarize=False,
                 nifti_path=case_path,
             )
-            probability_nifti.SetSpacing(spacing)
-            probability_nifti.SetDirection(direction)
-            probability_nifti.SetOrigin(origin)
+            logging.debug(
+                "training preview saved image geometry before metadata overwrite size=%s spacing=%s origin=%s",
+                probability_nifti.GetSize(),
+                probability_nifti.GetSpacing(),
+                probability_nifti.GetOrigin(),
+            )
+            source_image = sitk.ReadImage(str(case_path))
+            probability_nifti.CopyInformation(source_image)
 
             prediction_dir.mkdir(parents=True, exist_ok=True)
             output_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{case_path.name}_train_probability.nii.gz"
@@ -282,6 +295,7 @@ def main() -> None:
     """Main training function."""
     # Parse arguments
     args = parse_args()
+    logging.basicConfig(level=DEBUG)
     
     # Load configuration
     config_path = Path(args.config)
