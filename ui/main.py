@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import asyncio
 import json
 import logging
 import shutil
@@ -7,7 +9,7 @@ import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -21,6 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from core.config import Config, RiskConfig
 from core.config_loader import load_config
 from data.risk_tabular import build_risk_data_bundle
+from ui.cta_segmentation import prepare_uploaded_volume_for_dataset, run_patch_based_segmentation
 from data.morphology_features import extract_morphology_features
 from model.risk.RiskCrossAttentionModel import RiskCrossAttentionModel
 
@@ -29,16 +32,28 @@ DEFAULT_CONFIG = APP_ROOT / "config" / "host.yaml"
 UPLOAD_DIR = APP_ROOT / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the Gradulate FastAPI UI")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_CONFIG),
+        help="Path to the YAML config file used by the UI",
+    )
+    return parser.parse_args()
+
 app = FastAPI(title="Gradulate CTA UI")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # type: ignore[list-item]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-STATE: dict[str, Any] = {"config_path": str(DEFAULT_CONFIG), "config": None}
+ARGS = parse_args()
+STATE: dict[str, Any] = {"config_path": str(Path(ARGS.config).expanduser()), "config": None}
 logger = logging.getLogger("gradulate.api")
 if not logger.handlers:
     logging.basicConfig(
@@ -94,23 +109,94 @@ async def upload_cta(cta_file: UploadFile = File(...)) -> JSONResponse:
 
 
 @app.post("/api/cta/segment")
-async def segment_cta(cta_file: UploadFile = File(...)) -> JSONResponse:
-    temp_path = _save_upload(cta_file)
-    mask_base = temp_path.name.removesuffix(".nii.gz")
-    mask_path = temp_path.with_name(f"{mask_base}_mask.nii.gz")
-    shutil.copyfile(temp_path, mask_path)
+async def segment_cta(
+    cta_file: UploadFile = File(...),
+    config_path: str = Form(default=""),
+    checkpoint_path: str = Form(
+        default="",
+        description="Optional .pth on the server; if omitted, uses checkpoint.save_dir/latest.pth from the YAML.",
+    ),
+) -> JSONResponse:
+    """Run 3D segmentation: load YAML config and weights, resample, tile, predict, stitch, restore spacing."""
+    resolved_config_path = Path(config_path.strip() or STATE["config_path"]).expanduser()
+    resolved_config_path = (
+        resolved_config_path.resolve()
+        if resolved_config_path.is_absolute()
+        else (APP_ROOT / resolved_config_path).resolve()
+    )
+    if not resolved_config_path.is_file():
+        raise HTTPException(status_code=400, detail=f"config file not found: {resolved_config_path}")
+
+    segmentation_configuration = load_config(resolved_config_path)
+
+    checkpoint_path_stripped = checkpoint_path.strip()
+    if checkpoint_path_stripped:
+        resolved_checkpoint_path = Path(checkpoint_path_stripped).expanduser()
+        resolved_checkpoint_path = (
+            resolved_checkpoint_path.resolve()
+            if resolved_checkpoint_path.is_absolute()
+            else (APP_ROOT / resolved_checkpoint_path).resolve()
+        )
+    else:
+        resolved_checkpoint_path = (
+            APP_ROOT / Path(segmentation_configuration.checkpoint.save_dir) / "latest.pth"
+        ).resolve()
+
+    if not resolved_checkpoint_path.is_file():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Checkpoint not found: {resolved_checkpoint_path}. "
+                "Send form field checkpoint_path, or train once so latest.pth exists under checkpoint.save_dir."
+            ),
+        )
+    uploaded_cta_path = _save_upload(cta_file)
+    upload_identifier = uploaded_cta_path.name.removesuffix(".nii.gz").removesuffix(".nii")
+    # One directory per request so ``MedicalPatchDataset`` never mixes this scan with older uploads.
+    inference_workspace = UPLOAD_DIR / "segmentation_runs" / upload_identifier
+    inference_workspace.mkdir(parents=True, exist_ok=True)
+
+    dataset_ready_volume_path = prepare_uploaded_volume_for_dataset(
+        uploaded_file=uploaded_cta_path,
+        destination_directory=inference_workspace,
+        file_patterns=list(segmentation_configuration.data.file_patterns),
+        upload_identifier=upload_identifier,
+    )
+
+    # Flat names under ``uploads/`` so ``GET /files/{name}`` can serve them without nested paths.
+    probability_output_path = UPLOAD_DIR / f"{upload_identifier}_segmentation_probability.nii.gz"
+    binary_mask_output_path = UPLOAD_DIR / f"{upload_identifier}_segmentation_mask.nii.gz"
+
+    device = torch.device(
+        segmentation_configuration.device if torch.cuda.is_available() else "cpu"
+    )
+
+    await asyncio.to_thread(
+        run_patch_based_segmentation,
+        configuration=segmentation_configuration,
+        checkpoint_file=resolved_checkpoint_path,
+        input_volume_path=dataset_ready_volume_path,
+        probability_output_path=probability_output_path,
+        binary_mask_output_path=binary_mask_output_path,
+        device=device,
+    )
+
     logger.info(
-        "cta segmented original=%s cta=%s mask=%s",
+        "cta segmentation finished original=%s config=%s checkpoint=%s mask=%s",
         cta_file.filename,
-        temp_path.name,
-        mask_path.name,
+        resolved_config_path.name,
+        resolved_checkpoint_path.name,
+        binary_mask_output_path.name,
     )
     return JSONResponse(
         {
             "ok": True,
-            "cta_path": f"/files/{temp_path.name}",
-            "mask_path": f"/files/{mask_path.name}",
-            "message": "已完成示例分割，实际分割模型可在这里替换。",
+            "config_path": str(resolved_config_path),
+            "checkpoint_path": str(resolved_checkpoint_path),
+            "cta_path": f"/files/{uploaded_cta_path.name}",
+            "mask_path": f"/files/{binary_mask_output_path.name}",
+            "probability_path": f"/files/{probability_output_path.name}",
+            "message": "Resampled, patch-inferred, stitched, and geometry restored to match the uploaded volume.",
         }
     )
 
@@ -221,7 +307,7 @@ def _save_upload(upload: UploadFile | None) -> Path:
         suffix = Path(upload_name).suffix or ".nii.gz"
     dest = UPLOAD_DIR / f"{uuid.uuid4().hex}{suffix}"
     with dest.open("wb") as f:
-        shutil.copyfileobj(upload.file, f)
+        shutil.copyfileobj(upload.file, cast("Any", f))
     return dest
 
 

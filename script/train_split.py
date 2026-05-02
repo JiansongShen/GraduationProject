@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
+import SimpleITK as sitk
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
@@ -23,7 +24,9 @@ from core.config_loader import load_config
 from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
-from script.eval_split import evaluate, dice_loss, combined_loss
+from script.eval_split import evaluate
+from script.eval_utils import align_target_shape, combine_to_nifti, combined_loss, dice_loss, sequential_patch_prediction
+from script.common import setup_basic_logging
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,19 +123,6 @@ def build_scheduler(optimizer: torch.optim.Optimizer, cfg: Config, total_epochs:
     else:
         raise ValueError(f"Unsupported scheduler: {cfg.train.scheduler}")
 
-def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Match target tensor rank/shape to prediction tensor for segmentation losses."""
-    if target.ndim == pred.ndim - 1:
-        target = target.unsqueeze(1)
-
-    if target.shape != pred.shape:
-        raise ValueError(
-            f"Prediction/target shape mismatch after alignment: pred={tuple(pred.shape)}, target={tuple(target.shape)}"
-        )
-
-    return target
-
-
 def train_one_epoch(
     model: torch.nn.Module,
     dataset: MedicalPatchDataset,
@@ -141,6 +131,9 @@ def train_one_epoch(
     epoch: int,
     writer: SummaryWriter,
     cfg: Config,
+    *,
+    save_training_prediction: bool = False,
+    prediction_dir: Path | None = None,
 ) -> float:
     """Train for one epoch by loading one case at a time."""
     model.train()
@@ -152,15 +145,21 @@ def train_one_epoch(
 
     for batch_idx in range(total_volumes):
         logging.debug("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
-        
-        # if !dataset.ensure_can_load_case(batch_idx):
-        #     continue
 
         images, labels = dataset[batch_idx]
 
         if labels is None:
             logging.warning("Epoch %s volume %s/%s has no labels. Skipping.", epoch + 1, batch_idx + 1, total_volumes)
             continue
+
+        if save_training_prediction and batch_idx == 0 and prediction_dir is not None:
+            logging.info(
+                "Epoch %s first training case | image_shape=%s label_shape=%s patches=%s",
+                epoch + 1,
+                tuple(images.shape),
+                tuple(labels.shape),
+                int(images.shape[0]),
+            )
 
         patch_count = int(images.shape[0])
         logging.debug(
@@ -184,7 +183,6 @@ def train_one_epoch(
             optimizer.zero_grad()
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
-            # Using dice_loss as combined_loss was not defined/imported
             loss = combined_loss(outputs, batch_labels)
             loss.backward()
             optimizer.step()
@@ -206,6 +204,33 @@ def train_one_epoch(
 
             if num_batches % 10 == 0:
                 writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
+
+    if save_training_prediction and prediction_dir is not None:
+        try:
+            probability_patches, src_shape, case_path, spacing, direction, origin = sequential_patch_prediction(
+                model,
+                dataset,
+                case_index=0,
+                device=device,
+                batch_size=max(1, cfg.train.batch_size),
+            )
+            probability_nifti = combine_to_nifti(
+                probability_patches,
+                dataset.patch_size,
+                src_shape,
+                binarize=False,
+                nifti_path=case_path,
+            )
+            probability_nifti.SetSpacing(spacing)
+            probability_nifti.SetDirection(direction)
+            probability_nifti.SetOrigin(origin)
+
+            prediction_dir.mkdir(parents=True, exist_ok=True)
+            output_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{case_path.name}_train_probability.nii.gz"
+            sitk.WriteImage(probability_nifti, str(output_path))
+            logging.info("Saved training prediction for first case to %s", output_path)
+        except Exception:
+            logging.exception("Failed to save training prediction for epoch %s", epoch + 1)
 
     return epoch_loss / max(num_batches, 1)
 
@@ -278,14 +303,7 @@ def main() -> None:
     log_dir = Path(cfg.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_dir / "training.log"),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    setup_basic_logging(log_dir / "training.log")
     
     logging.info(f"Configuration loaded from: {config_path}")
     logging.info(f"Model: {cfg.model.name}")
@@ -365,6 +383,8 @@ def main() -> None:
             epoch,
             writer,
             cfg=cfg,
+            save_training_prediction=True,
+            prediction_dir=prediction_dir / "train",
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
         

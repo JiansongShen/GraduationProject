@@ -5,111 +5,11 @@ from pathlib import Path
 
 import SimpleITK as sitk
 import torch
-from SimpleITK import VectorUInt32
 from torch.utils.tensorboard import SummaryWriter
 
 from data.MedicalPatchDataset import MedicalPatchDataset
-from data.data_preprocesser import resample_in_memory
 from model.aneurysm.model.AttentionUnet import AttentionUnet
-
-
-def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
-    pred = torch.sigmoid(pred)
-    pred_flat = pred.view(-1)
-    target_flat = target.view(-1)
-    intersection = (pred_flat * target_flat).sum()
-    dice_coeff = (2.0 * intersection + smooth) / (pred_flat.sum() + target_flat.sum() + smooth)
-    return 1.0 - dice_coeff
-
-
-def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    pred = torch.sigmoid(pred)
-    bce = torch.nn.functional.binary_cross_entropy(pred, target)
-    dice = dice_loss(pred, target)
-    return bce + dice
-
-
-def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    if target.ndim == pred.ndim - 1:
-        target = target.unsqueeze(1)
-    if target.shape != pred.shape:
-        raise ValueError(
-            f"Prediction/target shape mismatch after alignment: pred={tuple(pred.shape)}, target={tuple(target.shape)}"
-        )
-    
-    # Ensure target values are in the range [0, 1] for binary cross-entropy
-    target = torch.clamp(target.float(), 0.0, 1.0)
-    
-    return target
-
-
-def combine_to_nifti(
-        patch_list: list[torch.Tensor],
-        patch_shape: tuple[int, int, int],
-        src_shape: tuple[int, int, int],
-        binarize: bool = False,
-        nifti_path: Path = None,
-) -> sitk.Image:
-    """Stitch sequential prediction patches back to one probability or binary volume."""
-    if not patch_list:
-        raise ValueError("Cannot stitch eval prediction: patch_list is empty.")
-
-    patch_d, patch_h, patch_w = patch_shape
-    src_d, src_h, src_w = src_shape
-    dtype = torch.uint8 if binarize else torch.float32
-    combined = torch.zeros(src_shape, dtype=dtype)
-    patch_idx = 0
-
-    # load the nifti file to check whether the patch list is compatible to combine one file
-    if nifti_path is None:
-        raise ValueError("Nifti path is required to combine patches.")
-    src_img = sitk.ReadImage(nifti_path)
-    resampled_img = resample_in_memory(src_img)
-    resampled_img_d, resampled_img_h, resampled_img_w = resampled_img.GetSize()
-
-    expect_patches_size: int = (
-            ((resampled_img_d + patch_d - 1) // patch_d)
-            * ((resampled_img_h + patch_h - 1) // patch_h)
-            * ((resampled_img_w + patch_w - 1) // patch_w))
-
-    if expect_patches_size != len(patch_list):
-        raise ValueError(f"Invalid patch list size: {len(patch_list)}, expected {expect_patches_size}")
-
-    for z in range(0, src_d, patch_d):
-        for y in range(0, src_h, patch_h):
-            for x in range(0, src_w, patch_w):
-                if patch_idx >= len(patch_list):
-                    image = sitk.GetImageFromArray(combined.numpy())
-                    return sitk.Cast(image, sitk.sitkUInt8) if binarize else image
-
-                patch = patch_list[patch_idx].detach().cpu()
-                while patch.ndim > 3:
-                    patch = patch[0]
-                if tuple(patch.shape) != patch_shape:
-                    raise ValueError(f"Invalid eval patch shape: {tuple(patch.shape)}, expected {patch_shape}")
-
-                # Calculate actual patch boundaries considering potential overflow
-                z_end = min(z + patch_d, src_d)
-                y_end = min(y + patch_h, src_h)
-                x_end = min(x + patch_w, src_w)
-
-                # Calculate the actual size needed for this patch
-                actual_patch_d = z_end - z
-                actual_patch_h = y_end - y
-                actual_patch_w = x_end - x
-
-                # Extract the appropriate slice of the patch to fit in the destination
-                actual_patch = patch[:actual_patch_d, :actual_patch_h, :actual_patch_w]
-
-                if binarize:
-                    combined[z:z_end, y:y_end, x:x_end] = (actual_patch > 0.5).to(torch.uint8)
-                else:
-                    combined[z:z_end, y:y_end, x:x_end] = actual_patch.float().clamp(0.0, 1.0)
-
-                patch_idx += 1
-
-    image = sitk.GetImageFromArray(combined.numpy())
-    return sitk.Cast(image, sitk.sitkUInt8) if binarize else image
+from script.eval_utils import align_target_shape, combine_to_nifti, combined_loss, dice_loss
 
 
 @torch.no_grad()
@@ -172,16 +72,17 @@ def evaluate(
             batch_labels = align_target_shape(outputs, batch_labels)
             loss = combined_loss(outputs, batch_labels)
 
-            pred_binary = (outputs > 0.5).float()
-            output_min = float(outputs.min().item())
-            output_max = float(outputs.max().item())
-            output_mean = float(outputs.mean().item())
+            output_prob = torch.sigmoid(outputs)
+            pred_binary = (output_prob > 0.5).float()
+            output_min = float(output_prob.min().item())
+            output_max = float(output_prob.max().item())
+            output_mean = float(output_prob.mean().item())
             output_positive_ratio = float(pred_binary.mean().item())
             target_positive_ratio = float((batch_labels > 0.5).float().mean().item())
             if store_single_res and sample_idx == 0:
-                patch_list.extend([patch.detach().cpu() for patch in outputs[:, 0]])
+                patch_list.extend([patch.detach().cpu() for patch in output_prob[:, 0]])
 
-            dice = 1.0 - dice_loss(pred_binary, batch_labels)
+            dice = 1.0 - dice_loss(output_prob, batch_labels)
 
             epoch_loss += loss.item()
             epoch_dice += dice.item()
@@ -189,8 +90,8 @@ def evaluate(
 
             avg_loss = epoch_loss / num_batches
             avg_dice = epoch_dice / num_batches
-            logging.debug(
-                "Epoch %s validation volume %s/%s sequential patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f pred_min=%.6f pred_max=%.6f pred_mean=%.6f pred_positive_ratio=%.6f target_positive_ratio=%.6f global_patch_step=%s",
+            logging.info(
+                "Epoch %s validation volume %s/%s sequential patch batch %s-%s done: loss=%.6f dice=%.6f avg_loss=%.6f avg_dice=%.6f prob_min=%.6f prob_max=%.6f prob_mean=%.6f pred_positive_ratio=%.6f target_positive_ratio=%.6f global_patch_step=%s",
                 epoch + 1,
                 sample_idx + 1,
                 total_volumes,
@@ -318,15 +219,38 @@ def evaluate_full_pipeline(
             batch_labels = align_target_shape(outputs, batch_labels)
             loss = combined_loss(outputs, batch_labels)
 
-            pred_binary = (outputs > 0.5).float()
-            dice = 1.0 - dice_loss(pred_binary, batch_labels)
+            output_prob = torch.sigmoid(outputs)
+            pred_binary = (output_prob > 0.5).float()
+            dice = 1.0 - dice_loss(output_prob, batch_labels)
+
+            output_min = float(output_prob.min().item())
+            output_max = float(output_prob.max().item())
+            output_mean = float(output_prob.mean().item())
+            output_positive_ratio = float(pred_binary.mean().item())
+            target_positive_ratio = float((batch_labels > 0.5).float().mean().item())
 
             epoch_loss += loss.item()
             epoch_dice += dice.item()
             num_batches += 1
 
+            logging.info(
+                "Full pipeline epoch %s volume %s/%s patch batch %s-%s done: loss=%.6f dice=%.6f prob_min=%.6f prob_max=%.6f prob_mean=%.6f pred_positive_ratio=%.6f target_positive_ratio=%.6f",
+                epoch + 1,
+                sample_idx + 1,
+                total_volumes,
+                patch_start_idx + 1,
+                patch_end_idx,
+                loss.item(),
+                dice.item(),
+                output_min,
+                output_max,
+                output_mean,
+                output_positive_ratio,
+                target_positive_ratio,
+            )
+
             # Store predictions for later combination
-            for output_tensor in outputs:
+            for output_tensor in output_prob:
                 all_outputs.append(output_tensor.cpu())
 
         # Step 4: Combine patches back to full nifti volume
@@ -338,7 +262,15 @@ def evaluate_full_pipeline(
             all_outputs,
             dataset.patch_size,
             src_shape_tuple,
-            binarize=binarize_result
+            binarize=binarize_result,
+            nifti_path=Path(dataset.cases[sample_idx].image_path),
+        )
+        logging.info(
+            "Combined full pipeline prediction: case=%s patch_count=%s binarize=%s src_shape=%s",
+            Path(dataset.cases[sample_idx].image_path).name,
+            len(all_outputs),
+            binarize_result,
+            src_shape_tuple,
         )
 
         # Step 5: Restore original spacing to the combined prediction
