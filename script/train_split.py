@@ -12,6 +12,7 @@ from typing import Any, Callable
 import numpy as np
 import SimpleITK as sitk
 import torch
+from torch.nn.functional import binary_cross_entropy
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -184,7 +185,8 @@ def train_one_epoch(
             optimizer.zero_grad()
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
-            loss = combined_loss(outputs, batch_labels)
+            loss = binary_cross_entropy(outputs, batch_labels)
+
             loss.backward()
             optimizer.step()
 

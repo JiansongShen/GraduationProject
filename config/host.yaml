@@ -92,4 +92,4 @@ risk:
 device: "cuda"
 seed: 42
 log_dir: "logs"
-eval_interval: 5
+eval_interval: 50

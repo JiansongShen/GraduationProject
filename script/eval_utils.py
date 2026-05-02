@@ -90,7 +90,7 @@ def sequential_patch_prediction(
                 float(logits.max().item()),
                 float(logits.mean().item()),
             )
-            probabilities = torch.sigmoid(logits).detach().cpu()
+            probabilities = logits.detach().cpu()
             logging.debug(
                 "seq-predict batch=%s:%s prob shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
                 patch_start,
