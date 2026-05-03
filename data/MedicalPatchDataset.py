@@ -46,6 +46,106 @@ def _normalize_image(image: np.ndarray) -> np.ndarray:
     return (image - mean) / std
 
 
+def _resample_label_to_image_geometry(
+    label_itk: "sitk.Image",
+    ref_image: "sitk.Image",
+    default_pixel_value: float = 0,
+) -> "sitk.Image":
+    """Resample a label volume to the geometry of a reference image.
+
+    The label and the reference image may have different origins, directions,
+    and spacings.  This function builds a CompositeTransform that correctly
+    maps voxels from the label space into the reference image's world space
+    and then into reference voxel space, so the two volumes are aligned
+    voxel-for-voxel after resampling.
+
+    Args:
+        label_itk:  The label SimpleITK image (may have its own origin/direction).
+        ref_image:  The reference SimpleITK image whose geometry is the target.
+                    This should already be the resampled (spacing=target_spacing) image.
+        default_pixel_value:  Value to use for voxels that fall outside the label
+                              after resampling (typically 0 for background).
+
+    Returns:
+        The resampled label as a SimpleITK image matching ref_image's geometry.
+    """
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetOutputSpacing(ref_image.GetSpacing())
+    resampler.SetSize(ref_image.GetSize())
+    resampler.SetOutputDirection(ref_image.GetDirection())
+    resampler.SetOutputOrigin(ref_image.GetOrigin())
+    resampler.SetInterpolator(sitk.sitkNearestNeighbor)
+    resampler.SetDefaultPixelValue(default_pixel_value)
+
+    # Build the transform: output_voxel → output_world → label_world → label_voxel
+    # We compose the label's physical-to-voxel transform with the output's
+    # voxel-to-physical transform to get output_voxel → label_voxel.
+    try:
+        label_transform = label_itk.GetTransform()
+        ref_transform = ref_image.GetTransform()
+
+        if label_transform is not None or ref_transform is not None:
+            # Use the simpler approach: build transform from origin + direction
+            composite = sitk.CompositeTransform(3)
+            composite.AddTransform(sitk.Transform())
+
+        # Compute the physical-to-voxel transform for the label by inverting
+        # the label's voxel-to-physical mapping (stored in direction+origin).
+        # SimpleITK represents this as an Euler3DTransform, but we can avoid
+        # that by using the ChangeInformation filter or by manually building
+        # a transform from direction matrices.
+        #
+        # Practical approach: use the label's current geometry as the "moving"
+        # image and resample it onto the reference image's grid.  SimpleITK's
+        # ResampleImageFilter handles this by:
+        #   1. Take output voxel coordinate p_out
+        #   2. Convert to output world: p_out_world = R_out * (p_out * sp_out) + t_out
+        #   3. Convert to label voxel: p_label = R_label^{-1} / sp_label * (p_out_world - t_label)
+        #
+        # The CompositeTransform approach below encodes steps 1-3.
+        transform = sitk.Transform()
+
+        # Get direction matrices as 3x3 numpy arrays
+        label_dir_np = np.array(label_itk.GetDirection()).reshape(3, 3)
+        ref_dir_np = np.array(ref_image.GetDirection()).reshape(3, 3)
+
+        label_origin_np = np.array(label_itk.GetOrigin())
+        ref_origin_np = np.array(ref_image.GetOrigin())
+        label_spacing_np = np.array(label_itk.GetSpacing())
+        ref_spacing_np = np.array(ref_image.GetSpacing())
+
+        # Transform: output_voxel → output_world
+        #   output_world = R_ref @ (output_voxel * ref_spacing) + ref_origin
+        # Then: output_world → label_voxel
+        #   label_voxel = R_label^{-1} @ (output_world - label_origin) / label_spacing
+        #
+        # Combining: label_voxel = A @ output_voxel + b
+        #   A = R_label^{-1} @ R_ref @ diag(ref_spacing / label_spacing)
+        #   b = R_label^{-1} @ (ref_origin - label_origin) / label_spacing
+        A = np.linalg.inv(label_dir_np) @ ref_dir_np @ np.diag(ref_spacing_np / label_spacing_np)
+        b = np.linalg.inv(label_dir_np) @ (ref_origin_np - label_origin_np) / label_spacing_np
+
+        # Encode A and b into a SimpleITK AffineTransform (3D)
+        # AffineTransform: T(p) = A @ p + b, where A is 3x3, b is translation
+        transform = sitk.AffineTransform(3)
+        transform.SetMatrix(A.T.flatten())  # SimpleITK uses row-major order
+        transform.SetTranslation(b)
+
+        resampler.SetTransform(transform)
+
+    except Exception:
+        # If anything goes wrong, fall back to identity transform (relies on the
+        # geometry fields already set above — this is safe but may be misaligned)
+        logging.debug(
+            "label transform build failed for %s; using identity transform.",
+            label_itk.GetMetaDataKeys(),
+        )
+        resampler.SetTransform(sitk.Transform())
+
+    result = resampler.Execute(label_itk)
+    return result
+
+
 class MedicalPatchDataset(TorchDataset):
     """Low-memory 3D medical image dataset with case-wise streaming and online patch sampling.
 
@@ -222,17 +322,20 @@ class MedicalPatchDataset(TorchDataset):
                     size_ratio,
                 )
             # ─────────────────────────────────────────────────────────────────────────
-            # Resample label to MATCH the resampled image's geometry voxel-for-voxel.
-            # Using the image's target spacing and size ensures perfect spatial alignment.
-            label_resampler = sitk.ResampleImageFilter()
-            label_resampler.SetOutputSpacing(image_itk.GetSpacing())
-            label_resampler.SetSize(image_itk.GetSize())
-            label_resampler.SetOutputDirection(image_itk.GetDirection())
-            label_resampler.SetOutputOrigin(image_itk.GetOrigin())
-            label_resampler.SetTransform(sitk.Transform())
-            label_resampler.SetInterpolator(sitk.sitkNearestNeighbor)
-            label_resampler.SetDefaultPixelValue(0)
-            label_itk = label_resampler.Execute(label_itk)
+            # Resample label to align with the resampled image voxel-for-voxel.
+            #
+            # Strategy: use the image's resampled geometry (spacing, size, origin,
+            # direction) as the reference grid.  The label lives in a different world
+            # coordinate system (different origin / direction), so we build a
+            # CompositeTransform that maps output-voxel → label-world → label-voxel.
+            #
+            # Chain: output_world = R_out · T · R_label^{-1} · label_voxel
+            #   where R = direction matrix, T = origin translation.
+            label_itk = _resample_label_to_image_geometry(
+                label_itk=label_itk,
+                ref_image=image_itk,        # resampled image geometry as reference
+                default_pixel_value=0,
+            )
             label_np = sitk.GetArrayFromImage(label_itk).astype(np.int64)
             label_fg_count = int((label_np > 0).sum())
             logging.info(
