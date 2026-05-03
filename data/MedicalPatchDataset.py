@@ -72,7 +72,60 @@ def _resample_label_to_image_geometry(
         A = R_L^{-1} @ R_R @ diag(sp_R / sp_L)
         b = R_L^{-1} @ (t_R - t_L) / sp_L
     """
-    # Build the affine transform: p_label = A @ p_ref + b
+    # ── Helpers ─────────────────────────────────────────────────────────────────────
+    def _overlap(a_min: float, a_max: float, b_min: float, b_max: float) -> str:
+        lo = max(a_min, b_min)
+        hi = min(a_max, b_max)
+        if hi <= lo:
+            return "NONE"
+        return f"{lo:.1f}~{hi:.1f} (width={hi-lo:.1f}mm)"
+
+    def _physical_bounds(itk_img: "sitk.Image") -> tuple:
+        sz = itk_img.GetSize()
+        corners_phys = [
+            itk_img.TransformIndexToPhysicalPoint((0, 0, 0)),
+            itk_img.TransformIndexToPhysicalPoint((sz[0] - 1, 0, 0)),
+            itk_img.TransformIndexToPhysicalPoint((0, sz[1] - 1, 0)),
+            itk_img.TransformIndexToPhysicalPoint((0, 0, sz[2] - 1)),
+            itk_img.TransformIndexToPhysicalPoint((sz[0] - 1, sz[1] - 1, sz[2] - 1)),
+        ]
+        all_x = [c[0] for c in corners_phys]
+        all_y = [c[1] for c in corners_phys]
+        all_z = [c[2] for c in corners_phys]
+        return (min(all_x), max(all_x), min(all_y), max(all_y), min(all_z), max(all_z))
+
+    # ── DIAGNOSTIC: show physical extents of label and reference image ──────────────
+    label_phys = _physical_bounds(label_itk)
+    ref_phys = _physical_bounds(ref_image)
+    ov_x = _overlap(label_phys[0], label_phys[1], ref_phys[0], ref_phys[1])
+    ov_y = _overlap(label_phys[2], label_phys[3], ref_phys[2], ref_phys[3])
+    ov_z = _overlap(label_phys[4], label_phys[5], ref_phys[4], ref_phys[5])
+    logging.warning(
+        "label_phys_world=(%.1f~%.1f, %.1f~%.1f, %.1f~%.1f) | "
+        "ref_phys_world=(%.1f~%.1f, %.1f~%.1f, %.1f~%.1f) | "
+        "overlap_x=%s overlap_y=%s overlap_z=%s",
+        *label_phys, *ref_phys, ov_x, ov_y, ov_z,
+    )
+
+    if ov_x == "NONE" or ov_y == "NONE" or ov_z == "NONE":
+        logging.error(
+            ">>> LABEL AND IMAGE HAVE NO OVERLAP IN PHYSICAL SPACE — DATA FILES MAY NOT BE PAIRED <<<"
+        )
+
+    # ── Build physical-space transform: output_voxel → label_voxel ─────────────────
+    # The reference image has already been resampled to target_spacing; the label has
+    # not.  We build an affine transform that maps each reference voxel to its
+    # corresponding label voxel in physical space, then resample the label onto the
+    # reference's voxel grid (same size + spacing as the reference image).
+    #
+    # SimpleITK voxel ↔ physical mapping:
+    #   physical = R @ (voxel * spacing) + origin
+    #
+    # To find the label voxel for a given reference voxel p_ref:
+    #   p_label = R_L^{-1} @ (R_R @ (p_ref * sp_R) + t_R - t_L) / sp_L
+    #           = A @ p_ref + b
+    #   with  A = R_L^{-1} @ R_R @ diag(sp_R / sp_L)
+    #         b = R_L^{-1} @ (t_R - t_L) / sp_L
     label_dir_np: np.ndarray = np.array(label_itk.GetDirection()).reshape(3, 3)
     ref_dir_np: np.ndarray = np.array(ref_image.GetDirection()).reshape(3, 3)
 
@@ -80,25 +133,27 @@ def _resample_label_to_image_geometry(
     label_dir_np = label_dir_np / np.linalg.norm(label_dir_np, axis=0, keepdims=True)
     ref_dir_np = ref_dir_np / np.linalg.norm(ref_dir_np, axis=0, keepdims=True)
 
-    label_origin_np: np.ndarray = np.array(label_itk.GetOrigin())
-    ref_origin_np: np.ndarray = np.array(ref_image.GetOrigin())
-    label_spacing_np: np.ndarray = np.array(label_itk.GetSpacing())
-    ref_spacing_np: np.ndarray = np.array(ref_image.GetSpacing())
+    label_origin_np = np.array(label_itk.GetOrigin())
+    ref_origin_np = np.array(ref_image.GetOrigin())
+    label_spacing_np = np.array(label_itk.GetSpacing())
+    ref_spacing_np = np.array(ref_image.GetSpacing())
 
     A = np.linalg.inv(label_dir_np) @ ref_dir_np @ np.diag(ref_spacing_np / label_spacing_np)
     b = (np.linalg.inv(label_dir_np) @ (ref_origin_np - label_origin_np) / label_spacing_np).astype(float)
 
     transform = sitk.AffineTransform(3)
-    transform.SetMatrix(A.T.flatten())          # SimpleITK: row-major 9-element tuple
+    transform.SetMatrix(A.T.flatten())   # SimpleITK uses row-major order
     transform.SetTranslation(b.tolist())
 
+    # Resample label onto the SAME voxel grid as the reference image (same size +
+    # spacing) so the two numpy arrays are directly index-aligned after return.
     resampler = sitk.ResampleImageFilter()
     resampler.SetOutputSpacing(ref_image.GetSpacing())
     resampler.SetSize(ref_image.GetSize())
     resampler.SetOutputDirection(ref_image.GetDirection())
     resampler.SetOutputOrigin(ref_image.GetOrigin())
     resampler.SetInterpolator(sitk.sitkNearestNeighbor)
-    resampler.SetDefaultPixelValue(default_pixel_value)
+    resampler.SetDefaultPixelValue(0)
     resampler.SetTransform(transform)
 
     result = resampler.Execute(label_itk)
@@ -110,11 +165,9 @@ def _resample_label_to_image_geometry(
     fg_after = int((result_arr > 0).sum())
     logging.info(
         "label_resample | fg_before=%d fg_after=%d | "
-        "spacing_L=%s sp_R=%s | size_L=%s size_R=%s",
+        "out_size=%s out_spacing=%s",
         fg_before, fg_after,
-        tuple(label_spacing_np.round(4)),
-        tuple(ref_spacing_np.round(4)),
-        label_itk.GetSize(), ref_image.GetSize(),
+        ref_image.GetSize(), ref_image.GetSpacing(),
     )
     return result
 
