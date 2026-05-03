@@ -1,60 +1,228 @@
 \section{实验设计与结果分析}
 
-\subsection{实验环境与实现配置}
-本文实验基于PyTorch框架实现，主要运行于Linux环境。分割任务和风险任务共享同一配置体系，核心参数如下：
+\subsection{实验说明与可复现性}
+本章的任务书对应关系可以概括为两条并行主线：\textbf{主线 A（影像）}——在 CTA 体数据上训练三维 Attention U-Net，输出与金标准可比对的分割概率图与二值掩膜；\textbf{主线 B（表型）}——在 Excel/CSV 表格上训练破裂风险二分类模型，输出校准前的风险概率及测试集评价摘要。两条主线在工程上通过可选的形态学/组学特征字段衔接，在答辩演示上通过 Web 界面串联。
+
+需要强调的是：受医院数据脱敏、伦理审批进度与算力排期等限制，不同复现者在 Dice、AUC 等具体数值上可能存在差异；\textbf{正式归档时，应以经审批数据集上、由本项目脚本与日志导出的客观记录为准}。下文除特别标注外，凡出现“示例性”表格或百分比，均可在定稿前整体替换为实测；章节后半部分则尽量扩充\textbf{与代码一致的过程性描述}，避免仅有少量数字而缺少实验设计交代。
+
+\subsection{实验环境与主要依赖}
+\subsubsection{硬件与软件}
+本课题开发与调试的典型环境如下（答辩材料中可按实验室机器实录微调）：
 \begin{itemize}
-	\item 分割模型：3D Attention U-Net，输入通道1，输出通道1；
-	\item 分割训练：学习率$1\times10^{-4}$，默认Adam优化器，patch大小为$128\times128\times128$；
-	\item 风险模型：隐藏维度128，注意力头数4，交叉注意力层数5；
-	\item 风险训练：学习率$1\times10^{-3}$，batch size为64，采用加权二元交叉熵。
+	\item 操作系统：Linux（Ubuntu 20.04 LTS 或兼容发行版）；
+	\item GPU：NVIDIA CUDA 兼容显卡（例：RTX 3090，24GB 显存），用于三维卷积与批量矩阵运算；
+	\item Python：3.8 及以上（建议与 PyTorch 官方 wheel 版本说明一致）；
+	\item 深度学习框架：PyTorch，配合 MONAI 中的体数据变换、度量实现（若实际未调用 MONAI API，也可在论文中写“计划对接 MONAI 指标以统一口径”）；
+	\item 医学图像 IO：SimpleITK，用于读写 NIfTI、保留 spacing/origin/direction；
+	\item 实验管理：TensorBoard（训练曲线）、\texttt{tqdm}（终端进度条）、YAML（超参）；
+	\item 风险任务：Pandas、scikit-learn（划分、互信息、ROC/AUC）；
+	\item 演示服务：FastAPI、Uvicorn。
 \end{itemize}
 
-\subsection{评价指标}
-\subsubsection{分割任务指标}
-分割任务采用Dice系数作为主要指标：
-\begin{equation}
-Dice = \frac{2|P\cap G|}{|P|+|G|},
-\end{equation}
-其中$P$为预测前景集合，$G$为真实标注前景集合。Dice越高表示重叠程度越好。
+设备由配置文件中的 \texttt{device} 指定，并可用命令行 \texttt{--device cuda|cpu} 覆盖，便于笔记本 CPU 调试与服务器 GPU 训练切换。
 
-\subsubsection{风险预测指标}
-风险预测任务采用准确率（Accuracy）、F1值与AUC。设阈值化后预测为$\hat{y}$，真实标签为$y$，则准确率定义为：
-\begin{equation}
-Acc=\frac{1}{N}\sum_{i=1}^{N}\mathbb{I}(\hat{y}_i=y_i),
-\end{equation}
-其中$\mathbb{I}(\cdot)$为指示函数。F1用于平衡查准率与查全率，AUC用于衡量模型整体排序能力。
+\subsubsection{随机种子与版本记录}
+为便于问题复现，项目在 \texttt{core} 层对随机种子进行统一设置（如 NumPy、PyTorch CUDA）。建议在毕业论文附录中\textbf{固定给出}：Python 与 PyTorch 版本号、CUDA/cuDNN 版本、关键依赖包版本、所用配置文件路径（如 \texttt{config/remote.yaml}）及 Git 提交哈希（若适用）。答辩评委追问“结果能否复现”时，上述信息是最直接的技术答复。
 
-\subsection{分割实验结果分析}
-\subsubsection{训练过程表现}
-分割脚本在每个epoch进行验证，并记录训练损失、验证损失与验证Dice。通过前景优先补丁采样，模型早期即可见到足够病灶样本，缓解了前景稀疏造成的训练震荡。联合损失在本任务中表现稳定，能够同时约束像素分类和区域重叠。
+\subsection{数据协议与预处理约定}
+\subsubsection{分割任务数据}
+动脉瘤分割数据以 NIfTI（\texttt{.nii} 或 \texttt{.nii.gz}）为主。训练与验证目录由 \texttt{data.train\_dirs}、\texttt{data.eval\_dirs} 分别列出；若未单独指定验证目录，代码侧可能回退到训练目录（日志中会出现警告），此时验证 Dice 的独立性较弱，论文中应如实说明划分策略。
 
-\subsubsection{重建结果与可用性}
-评估阶段采用顺序补丁推理并重建整例NIfTI结果，输出包括概率图与二值图。实验实现表明：
+图像与标签通过文件名规则配对：\texttt{file\_patterns} 列出影像候选模式（如 \texttt{*\_origin.nii.gz}），\texttt{label\_suffix} 列出标签后缀（如 \texttt{\_label.nii.gz}、\texttt{\_ias.nii.gz}）。该设计允许同一批原始数据以不同预处理版本共存，只要后缀规则可唯一推断标签路径。
+
+体素各向异性通过重采样统一到目标 spacing；强度在补丁读取管线中标准化，以减轻不同扫描参数带来的灰度分布偏移。与二维分类数据集“固定张数图片”不同，体数据实验需额外记录：\textbf{纳入病例数}、\textbf{每例层厚/重建矩阵}、\textbf{标注金标准来源}（单专家/双专家融合）、\textbf{最小动脉瘤直径纳入标准}等，否则难以与其他文献横向对比。
+
+\subsubsection{破裂风险任务数据}
+风险建模依赖表格文件路径 \texttt{risk.excel\_path}、标签列 \texttt{label\_column}（如“破裂”）、病例 ID 列 \texttt{id\_column}。特征列可以显式枚举，也可以留空触发基于互信息（\texttt{feature\_select\_method: mutual\_info}）的自动筛选，并受 \texttt{auto\_max\_features} 上限约束。配置中还包含临床先验列（如性别、年龄、合并症等）、类别低频合并阈值（\texttt{categorical\_min\_frequency}）以及是否与影像组学特征对齐（\texttt{use\_pyradiomics\_overlap\_only}）等开关——这些字段决定了\textbf{实际输入模型的特征数量与语义}，论文中建议用表格列出“最终进入训练的数值列数、类别列数、各类基数”，而不是笼统写“数十个特征”。
+
+\subsection{主线 A：动脉瘤分割实验设计}
+\subsubsection{训练协议与超参数（与配置项对齐）}
+分割训练入口为 \texttt{script/train\_split.py}，核心超参由 YAML 的 \texttt{model} 与 \texttt{train} 段驱动。表~\ref{tab:seg_hyper} 归纳了与本仓库默认思路一致、且应在论文中逐项交代的关键项（具体取值以你实际使用的配置文件为准）。
+
+\begin{table}[htbp]
+	\centering
+	\caption{分割任务关键超参数与典型取值（请按实际 YAML 填写最终列）}
+	\label{tab:seg_hyper}
+	\begin{tabular}{p{4.2cm}p{7.8cm}}
+		\toprule
+		配置键 & 含义与实验设计说明 \\
+		\midrule
+		\texttt{model.depth}, \texttt{model.base\_filters} & 控制网络宽度与深度；深度越大感受野越大，但显存与过拟合风险同步上升。 \\
+		\texttt{model.norm\_type}, \texttt{model.activation}, \texttt{model.dropout} & 归一化与激活选择影响小批量统计稳定性；Dropout 在体数据中需谨慎开启。 \\
+		\texttt{train.epochs} & 总轮数；需结合 \texttt{eval\_interval} 观察验证 Dice 是否仍上升，避免无效延长训练。 \\
+		\texttt{train.batch\_size} & 本项目训练循环按“病例”迭代，常见取值为 1；应在文中解释为何不以更大 batch 堆叠多病例。 \\
+		\texttt{train.patch\_size} & 三维补丁边长，直接决定显存占用；可在消融中对比 $96^3$ 与 $128^3$ 等。 \\
+		\texttt{train.max\_patches\_per\_volume}, \texttt{data.patches\_per\_volume} & 每例最多采样补丁数，影响单 epoch 时长与前景覆盖。 \\
+		\texttt{data.patch\_sampling\_mode} & 训练用 \texttt{foreground\_priority} 可提高前景占比；验证/整例推理常改为 \texttt{sequential}。 \\
+		\texttt{data.background\_per\_foreground} & 前景补丁与背景补丁配比，用于压制“全预测背景”的平凡解。 \\
+		\texttt{train.optimizer}, \texttt{train.learning\_rate}, \texttt{train.weight\_decay} & 优化器选择与正则；可在附录给出学习率曲线截图。 \\
+		\texttt{train.scheduler}, \texttt{train.warmup\_epochs} & 学习率调度策略；若代码中 scheduler 步进尚未完全接线，应在论文中如实说明当前实际生效部分。 \\
+		\texttt{eval\_interval} & 每隔多少 epoch 做一次验证并刷新 \texttt{best.pth}。 \\
+		\texttt{checkpoint.save\_interval} & 周期性保存 \texttt{latest.pth}，用于防止中断后回滚。 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsubsection{训练过程监控与产出文件}
+每轮训练将 epoch 损失写入 TensorBoard 标量（目录一般为 \texttt{log\_dir/tensorboard}）。验证阶段由 \texttt{eval\_split.evaluate} 计算 Dice，并触发 \texttt{save\_checkpoint}：始终更新 \texttt{checkpoints/latest.pth}；若当前验证 Dice 高于历史最优，则写入 \texttt{checkpoints/best.pth}。论文中可截取 TensorBoard 中 \texttt{Loss/train\_epoch} 与验证 Dice 曲线各一张，作为“训练收敛行为”的定性证据。
+
+此外，脚本可选保存训练/验证过程中的补丁预测预览（路径与 \texttt{prediction\_dir} 相关），便于肉眼排查标签颠倒、强度窗口错误等低级问题。
+
+\subsubsection{整例推理与空间一致性}
+验证或离线测试时，数据集将补丁采样模式切换为顺序遍历，并对整例体积进行切块推理与拼接；随后利用 SimpleITK 写回 NIfTI，并恢复原始影像的 spacing、origin、direction。这一环节是\textbf{临床可用性}的关键：若缺失几何元数据，后续与放疗计划系统或手术导航叠加将失败。实验章节建议单独用一小节文字说明：推理输出包含\textbf{概率图}与\textbf{二值掩膜}两类文件，及其后缀命名约定。
+
+\subsubsection{分割结果的多维度解读（建议在答辩中展开）}
+即使暂不报告大量病例统计，也可以在文中预先搭建分析框架：
 \begin{itemize}
-	\item 补丁重建后空间元信息可正确恢复，不影响后续三维可视化；
-	\item 概率图可用于阈值敏感分析，二值图可直接用于形态学指标提取；
-	\item 流式策略在有限显存环境下仍能完成较大体数据处理。
+	\item \textbf{整体层面}：病例平均 Dice、Dice 的中位数与四分位距，反映算法稳定性；
+	\item \textbf{病灶尺度分层}：按瘤体等效直径将病例分桶，讨论小动脉瘤是否 Dice 偏低（部分体素过少导致Dice方差大）；
+	\item \textbf{解剖部位分层}：Willis 环与前循环、后循环动脉瘤在血管曲率与对比剂充盈上的差异，可能导致分割难易不同；
+	\item \textbf{错误类型}：假阴性（漏分割）与假阳性（血管锥或邻近骨质高密度误判）在临床上后果不同，可分别统计体素级敏感度/特异度；
+	\item \textbf{边界指标}：除 DSC 外，报告 95\% Hausdorff 距离，敏感于瘤颈区域的细小偏差。
 \end{itemize}
 
-\subsection{风险预测结果分析}
-\subsubsection{特征处理效果}
-数据预处理中，清洗、缺失填补、低频类别合并与互信息筛选对稳定训练至关重要。通过控制数值特征规模（auto\_max\_features），降低了高维组学特征噪声带来的过拟合风险。对于类别不平衡问题，引入正类权重可明显提升F1。
+\subsubsection{横向对比与消融实验框架}
+表~\ref{tab:seg_result} 给出分割任务常见的横向对比排版方式。\textbf{基线模型行}可通过三种途径之一填充：（1）在同一数据划分上复现文献公开配置；（2）在项目中临时替换 \texttt{build\_model} 为纯 3D U-Net 并保持相同补丁协议；（3）若工期不足，则删除基线数值，仅保留本文方法与定性讨论。
 
-\subsubsection{阈值搜索与泛化表现}
-与固定阈值0.5相比，基于验证集F1搜索的最优阈值在测试集上通常具有更好的类别平衡性。实验流程最终输出验证最优阈值、测试准确率、F1与AUC，便于在临床偏好（高敏感或高特异）之间进行策略切换。
+\begin{table}[htbp]
+	\centering
+	\caption{动脉瘤分割任务：方法—指标对比表（示例性数值，提交前请替换为实测）}
+	\label{tab:seg_result}
+	\begin{tabular}{cccccc}
+		\toprule
+		方法 & DSC(\%) & 95\%HD(mm) & 敏感性(\%) & 特异性(\%) & 训练时间(h)\\
+		\midrule
+		3D U-Net & 78.3 & 4.2 & 76.8 & 94.2 & 12.5 \\
+		3D U-Net++ & 81.2 & 3.6 & 79.5 & 94.8 & 16.8 \\
+		V-Net & 79.6 & 3.9 & 78.2 & 94.5 & 14.2 \\
+		本文 Attention U-Net & \textbf{85.7} & \textbf{2.8} & \textbf{84.1} & \textbf{96.3} & 15.3 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
-\subsubsection{交叉注意力机制分析}
-交叉注意力模块使数值特征token与类别特征token进行双向信息交互，优于简单拼接的独立编码方式。该设计更符合临床场景中“单一指标意义受多因素共同影响”的特征规律，提升了模型解释性与表达能力。
+消融实验建议覆盖第二章涉及的机制：注意力门控是否启用、损失是否包含 Dice、补丁采样是否前景优先、是否使用深度监督（若代码未实现则不予编造）。表~\ref{tab:ablation_result} 给出记录模板。
 
-\subsection{消融与不足讨论}
-\subsubsection{关键设计收益}
-结合代码实现与训练日志，本文认为以下设计对结果有直接贡献：
-\begin{enumerate}
-	\item 分割任务中的前景优先采样，提升了病灶学习效率；
-	\item Dice+BCE联合损失，提高了边界区域与整体区域的一致性；
-	\item 风险任务中的阈值搜索与加权损失，提高了不平衡样本下F1表现；
-	\item 交叉注意力融合，增强了异构特征耦合建模能力。
-\end{enumerate}
+\subsection{主线 B：破裂风险预测实验设计}
+\subsubsection{数据划分与泄漏防护}
+\texttt{train\_risk.py} 通过 \texttt{test\_size}、\texttt{val\_size} 与 \texttt{random\_state} 完成训练集、验证集与测试集的划分。论文中应明确：互信息特征筛选\textbf{仅在训练集上拟合}，再将同一变换应用到验证与测试；若误用全部样本做筛选，会造成标签泄漏，AUC 虚高。若课题使用病例 ID 去重或家族簇抽样，也需在文中说明，否则表格任务的“独立同分布”假设不成立。
 
-\subsubsection{当前局限}
-本文工作仍存在改进空间：第一，分割网络目前以单模型为主，尚未系统进行多架构对比；第二，风险预测以表格特征为核心，尚未与深层影像特征端到端联合训练；第三，缺少多中心外部数据验证，模型泛化能力仍需进一步评估。
+\subsubsection{模型超参数与训练细节}
+表~\ref{tab:risk_hyper} 列出风险模块在配置中的主要接口，与 \texttt{RiskCrossAttentionModel} 构造函数一一对应。
+
+\begin{table}[htbp]
+	\centering
+	\caption{破裂风险任务关键超参数与含义（按实际 YAML 填写取值）}
+	\label{tab:risk_hyper}
+	\begin{tabular}{p{4cm}p{8cm}}
+		\toprule
+		配置键 & 含义 \\
+		\midrule
+		\texttt{risk.hidden\_dim} & 隐空间维度，需与 \texttt{num\_heads} 整除约束一致。 \\
+		\texttt{risk.num\_heads} & 多头注意力头数；头数过多在小样本下可能过拟合。 \\
+		\texttt{risk.num\_layers} & 双向交叉注意力堆叠层数，depth 越大模型容量越大。 \\
+		\texttt{risk.dropout} & Dropout 比率，配合 LayerNorm 与 GELU 缓解过拟合。 \\
+		\texttt{risk.epochs}, \texttt{risk.batch\_size} & 表格任务通常可采用较大 batch；若类别极不均衡，可适当减小 batch 以增加梯度噪声、配合加权损失。 \\
+		\texttt{risk.learning\_rate}, \texttt{risk.weight\_decay} & 优化器通常采用 AdamW；权重衰减对嵌入表同样生效。 \\
+		\texttt{risk.use\_pos\_weight} & 是否根据训练集正负比自动设置正类权重。 \\
+		\texttt{risk.threshold\_search\_steps} & 验证集上阈值扫描的离散点数；影响 F1 最优解的分辨率。 \\
+		\texttt{risk.early\_stopping\_patience} 等 & 早停策略，防止验证集指标长期不升时过训练。 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsubsection{优化目标与决策阈值}
+训练损失为加权二元交叉熵，正类权重由训练集样本频次估计。验证阶段在每个 epoch 结束后，将验证集预测概率在 $(0.05,0.95)$ 上做多阈值搜索，以\textbf{宏平均 F1} 为主准则更新当前阈值；测试阶段固定验证集上选出的最优阈值，输出准确率、精确率、召回率与 AUC。论文中建议补充一句：若临床更重视“不漏诊破裂风险”，可在讨论中改用召回率或加权代价敏感准则重新搜索阈值。
+
+\subsubsection{产出物与结果登记表}
+训练结束后，目录 \texttt{risk.save\_dir} 下通常生成：
+\begin{itemize}
+	\item \texttt{risk\_cross\_attention.pt}：模型权重与还原所需的列名、类别基数等元数据；
+	\item \texttt{risk\_report.json}：验证集最优 F1、AUC、阈值及测试集指标摘要。
+\end{itemize}
+答辩材料可将 JSON 中字段摘抄为表~\ref{tab:risk_result} 的“本文方法”行，避免手工抄错。
+
+\begin{table}[htbp]
+	\centering
+	\caption{破裂风险预测任务：方法—指标对比表（示例性数值，提交前请替换为 risk\_report.json 实测）}
+	\label{tab:risk_result}
+	\begin{tabular}{ccccccc}
+		\toprule
+		方法 & 准确率(\%) & 精确率(\%) & 召回率(\%) & F1分数(\%) & AUC & 训练时间(min)\\
+		\midrule
+		逻辑回归 & 72.4 & 69.8 & 73.2 & 71.5 & 0.756 & 2.3 \\
+		SVM & 73.8 & 71.2 & 72.6 & 71.9 & 0.763 & 4.7 \\
+		Random Forest & 74.6 & 72.1 & 74.3 & 73.2 & 0.771 & 3.8 \\
+		XGBoost & 76.2 & 73.5 & 75.8 & 74.6 & 0.785 & 5.2 \\
+		本文交叉注意力模型 & \textbf{81.4} & \textbf{79.3} & \textbf{82.1} & \textbf{80.7} & \textbf{0.842} & 8.7 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsubsection{风险模型的结果解读要点}
+除整体 AUC 外，建议在讨论中预留以下分析维度：
+\begin{itemize}
+	\item \textbf{校准性}：预测概率是否系统性偏高/偏低（可通过可靠性曲线或分箱后的 observed rate 评估）；
+	\item \textbf{少数类表现}：破裂阳性样本较少时，单独报告阳性子集的敏感度；
+	\item \textbf{特征维度敏感性}：改变 \texttt{auto\_max\_features} 或手动剔除某类临床字段后，AUC 变化是否剧烈，用以判断模型是否依赖个别字段；
+	\item \textbf{与分割衔接}：若 UI 或后处理脚本将分割体积导入形态学特征（如瘤体体积、长径），应说明该特征是否纳入风险模型及噪声来源（分割误差传递）。
+\end{itemize}
+
+\subsection{系统集成与演示实验}
+\subsubsection{Web 接口层面的任务闭环}
+\texttt{ui/main.py} 提供 HTTP API：上传 CTA 体积后调用与训练一致的补丁推理逻辑；风险预测端加载 \texttt{risk\_cross\_attention.pt} 并对表单字段编码。论文中可增加一小段“演示实验”：记录一次端到端请求耗时、占用显存峰值、返回 JSON 字段是否齐全。该类实验不替代离线批量评测，但能证明\textbf{集成链路可用}。
+
+\subsubsection{任务书交付物对照表}
+为方便评委核对“是否完成题目要求”，可将交付物梳理为表~\ref{tab:deliverables}（路径按仓库实际为准）。
+
+\begin{table}[htbp]
+	\centering
+	\caption{毕业设计任务与仓库产出物对照（示例）}
+	\label{tab:deliverables}
+	\begin{tabular}{p{3.6cm}p{9cm}}
+		\toprule
+		任务书要求 & 对应实现与佐证材料 \\
+		\midrule
+		动脉瘤分割/检测 & \texttt{train\_split.py}、\texttt{eval\_split.py}、\texttt{best.pth}、验证 Dice 曲线、NIfTI 预测结果 \\
+		破裂风险预测 & \texttt{train\_risk.py}（需 \texttt{risk.enabled: true}）、\texttt{risk\_report.json}、混淆矩阵（可自行脚本绘制） \\
+		可视化或交互 & FastAPI UI、上传接口日志、浏览器截图 \\
+		可复现实验 & YAML 配置、随机种子、依赖版本说明、附录训练命令 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{消融实验与灵敏度分析}
+表~\ref{tab:ablation_result} 汇总分割与风险两侧可做的消融维度。实施原则是：每次只改一个因素，固定随机种子与数据划分。
+
+\begin{table}[htbp]
+	\centering
+	\caption{消融实验记录模板（请替换为实测）}
+	\label{tab:ablation_result}
+	\begin{tabular}{ccccc}
+		\toprule
+		配置 & DSC(\%) & 95\%HD(mm) & 准确率(\%) & AUC \\
+		\midrule
+		去除注意力门控 & 78.3 & 4.2 & - & - \\
+		仅 BCE、无 Dice & 83.1 & 3.2 & - & - \\
+		完整分割管线 & \textbf{85.7} & \textbf{2.8} & - & - \\
+		\midrule
+		浅层 MLP 风险基线 & - & - & 76.2 & 0.785 \\
+		加入交叉注意力层 & - & - & 79.8 & 0.821 \\
+		再加入验证集阈值搜索 & - & - & \textbf{81.4} & \textbf{0.842} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+灵敏度分析建议至少覆盖：\texttt{patch\_size}、\texttt{patches\_per\_volume}、\texttt{risk.hidden\_dim}、互信息保留特征数。可将横轴为超参取值、纵轴为验证指标的折线图附在答辩附录。
+
+\subsection{可视化与定性案例分析}
+图~\ref{fig:case_study} 建议展示至少两类病例：\textbf{Dice 较高}的代表性成功病例，与\textbf{Dice 偏低或存在临床关切误差}的困难病例；每张图旁配以简短文字说明可能原因（瘤体过小、运动伪影、邻近骨质干扰等）。
+
+\begin{figure}[htbp]
+	\centering
+	\fbox{\parbox{0.72\textwidth}{\centering\vspace{2.8cm}\songti 此处插入分割可视化效果图（最大密度投影或轴位/冠状位拼图；建议标注金标准轮廓与预测轮廓）\vspace{2.8cm}}}
+	\caption{典型分割结果示意（占位：可替换为 \texttt{includegraphics} 指向实测截图）}
+	\label{fig:case_study}
+\end{figure}
+
+\subsection{本章小结}
+本章在保留“评价指标 + 对比实验表”的主干之外，补充了与\textbf{实际代码一致}的训练协议、配置键说明、监控产物路径、风险划分与泄漏防护、阈值搜索逻辑、系统集成演示及任务书交付对照。定稿时请将示例性数值替换为 TensorBoard、\texttt{risk\_report.json} 与整例评估脚本的实测记录，并按分层分析框架补全讨论段落，使第3章篇幅与工作量相匹配。

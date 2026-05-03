@@ -1,66 +1,73 @@
 \section{系统实现与方法设计}
 
 \subsection{系统总体架构}
-本文实现的系统由两个核心任务组成：动脉瘤分割任务与破裂风险预测任务。整体流程如下：
+本文实现的系统由两个核心任务组成：CTA 体数据的动脉瘤分割任务，以及基于表型数据的破裂风险二分类任务。整体数据流如下：
 \begin{enumerate}
-	\item 输入CTA体数据，完成重采样与标准化；
-	\item 基于三维Attention U-Net进行病灶分割，输出概率图与二值掩膜；
-	\item 结合临床信息与可选影像组学/形态学特征，构建风险特征表；
-	\item 采用交叉注意力模型完成破裂风险二分类预测。
+	\item 输入 NIfTI 格式的 CTA 体数据，在线完成体素间距重采样与强度标准化；
+	\item 基于三维 Attention U-Net 进行病灶分割，输出与原始坐标系对齐的概率图与二值掩膜；
+	\item 可选地由分割掩膜提取形态学参数，或与影像组学流水线衔接；结合 Excel/CSV 中的临床字段构建风险建模特征表；
+	\item 采用 \texttt{RiskCrossAttentionModel} 对数值与类别特征联合编码，输出破裂风险概率，并在验证集上确定推理阈值。
 \end{enumerate}
 
-该流程对应项目中两个训练脚本：\texttt{train\_split.py}负责分割模型训练，\texttt{train\_risk.py}负责风险模型训练，二者共享统一配置文件，便于实验管理与复现。
+上述流程在代码层面由两个入口脚本驱动：\texttt{script/train\_split.py} 负责分割模型训练与验证指标回调，\texttt{script/train\_risk.py} 在配置项 \texttt{risk.enabled=true} 时独立训练风险模型。二者共享同一 YAML 配置文件（如 \texttt{config/remote.yaml}），便于统一管理随机种子、设备与日志目录。
 
-\subsection{动脉瘤分割模块设计}
-\subsubsection{数据组织与流式补丁采样}
-三维医学影像体积大、显存占用高。为适应普通GPU环境，本文采用病例级流式加载策略：每次仅加载单个病例，在线完成预处理与补丁采样后立即释放。数据集模块支持以下机制：
-\begin{itemize}
-	\item 多目录扫描与图像-标签自动匹配（按后缀规则推断标签路径）；
-	\item 体素间距重采样，统一到目标 spacing；
-	\item z-score标准化；
-	\item 前景优先、仅前景、顺序遍历三种补丁采样模式。
-\end{itemize}
-
-对训练样本不平衡问题，采用“前景补丁+背景补丁配比”策略，使模型在关注病灶区域的同时保留背景判别能力。补丁大小由配置指定，默认使用三维立方体补丁。
-
-\subsubsection{网络结构}
-分割模型基于Attention U-Net思想\cite{attention_unet}实现，主体由编码器、瓶颈层和解码器组成。编码端逐层提取高语义特征，解码端通过跳跃连接融合浅层空间细节。与标准U-Net相比，注意力门控能够抑制无关背景响应，提升小病灶区域的有效特征利用率。
-
-\subsubsection{损失函数与训练策略}
-训练目标采用二元交叉熵与Dice损失联合形式：
-\begin{equation}
-\mathcal{L}_{seg} = \mathcal{L}_{BCE} + \mathcal{L}_{Dice},
-\end{equation}
-其中Dice损失定义为：
+\subsection{相关理论简述}
+\subsubsection{全卷积分割与 Dice 损失}
+全卷积结构将分类网络中的全连接层替换为卷积层，使网络可直接输出与输入同分辨率的空间概率图\cite{long2015,unet}。对于动脉瘤这类前景体素占比极小的任务，仅在像素级优化交叉熵往往导致预测偏向背景。Dice 系数衡量预测区域与标注区域的重叠程度，基于 Dice 的损失函数可显式增大阳性区域的梯度贡献，其常用形式为：
 \begin{equation}
 \mathcal{L}_{Dice}=1-\frac{2\sum_{i}p_i g_i+\epsilon}{\sum_i p_i+\sum_i g_i+\epsilon},
 \end{equation}
-$p_i$表示预测值，$g_i$表示真实标签，$\epsilon$为平滑项。该损失兼顾像素级稳定优化与区域重叠度优化，对前景占比较低的任务更友好。
+其中 $p_i\in[0,1]$ 为体素 $i$ 的预测概率，$g_i\in\{0,1\}$ 为对应标签，$\epsilon$ 为小常数用于数值稳定。
 
-优化器支持Adam、AdamW与SGD，默认采用Adam。训练过程中记录批次损失与轮次损失，并定期保存`latest`与`best`检查点。
+\subsubsection{注意力门控跳跃连接}
+标准 U-Net 将编码器特征直接与解码器特征拼接，可能引入大量与病灶无关的背景响应。Attention U-Net 在每次上采样后与跳跃特征融合前，引入门控图对跳跃特征进行逐元素加权\cite{attention_unet}。设 $g$ 为解码器当前分辨率下的特征图，$s$ 为同尺度跳跃特征，门控权重的计算可概括为：
+\begin{align}
+a &= \sigma\bigl(\psi(\mathrm{ReLU}(W_g(g)+W_s(s)))\bigr), \\
+\hat{s} &= a \odot s,
+\end{align}
+其中 $W_g$、$W_s$ 为 $1\times1\times1$ 卷积与归一化组成的线性投影，$\psi$ 将通道压缩为单通道并经 Sigmoid 得到 $a$，$\odot$ 为逐元素乘法，$\sigma$ 与实现中的 Sigmoid 一致。解码器最终接收的是经过滤波的 $\hat{s}$ 与上采样特征拼接后的张量。本项目在 \texttt{UpSampleBlock} 中调用 \texttt{AttentionGate} 实现上述过程。
 
-\subsubsection{评估与结果重建}
-评估阶段使用顺序补丁采样对整例进行推理，再将补丁结果按空间位置拼接为完整体数据。系统同时保存概率图和阈值化掩膜，并恢复原始图像的 spacing、origin 与 direction，确保结果可直接用于后续临床可视化或特征提取。
-
-\subsection{破裂风险预测模块设计}
-\subsubsection{表格数据预处理}
-风险预测输入包含临床变量、可选影像组学特征及可选分割后形态学特征。预处理流程包括：
+\subsection{动脉瘤分割模块设计}
+\subsubsection{数据组织与流式补丁采样}
+三维医学影像体积大、显存占用高。为适应单卡训练环境，\texttt{MedicalPatchDataset} 采用病例级流式策略：每个迭代步仅完整加载一例体积，在线完成重采样、标准化与补丁裁剪后再参与前向与反向传播，必要时释放中间缓存。数据集模块支持的主要机制包括：
 \begin{itemize}
-	\item 缺失列检查、重复样本去除、字段清洗；
-	\item 数值列中位数填补与标准化；
-	\item 类别列低频值合并与整数编码；
-	\item 互信息特征筛选，控制高维数值特征规模。
+	\item 多目录扫描与图像—标签路径匹配（依据文件名后缀规则推断标签文件）；
+	\item 将各向异性 spacing 重采样到 YAML 中指定的目标间距，减少不同扫描仪之间的尺度差异；
+	\item 对强度进行 z-score 或窗口化等标准化（以配置为准），抑制极端 HU 值对梯度的影响；
+	\item \texttt{foreground\_priority}、\texttt{foreground\_only}、\texttt{sequential} 等补丁采样模式：训练阶段偏向包含前景的立方体补丁，验证/推理阶段可采用顺序滑窗以覆盖全体积。
 \end{itemize}
 
-当启用“影像组学重叠列”模式时，系统会依据已分割结果自动提取可用组学字段并与临床字段合并，减少无效特征引入。
+针对前景稀疏问题，配置项 \texttt{background\_per\_foreground} 控制“每个前景补丁后附带多少个背景补丁”的配比，使模型既见到足够动脉瘤体素，又不遗忘血管周边组织的判别边界。补丁尺寸由 \texttt{train.patch\_size} 给定，仓库默认示例为 $128\times128\times128$ 体素立方体；每例体积的最大补丁采样次数由 \texttt{patches\_per\_volume}、\texttt{max\_patches\_per\_volume} 等字段约束。
 
-\subsubsection{交叉注意力风险模型}
-风险模型采用“数值特征流+类别特征流”的双流表示。数值特征先映射为token序列，类别特征经嵌入层编码后形成另一组token，随后执行多层双向交叉注意力：
+\subsubsection{网络结构与输出层}
+分割模型类 \texttt{AttentionUnet} 继承统一的 \texttt{Unet} 骨架：\texttt{UnetEncoder} 逐层下采样并记录各尺度通道宽度，\texttt{UnetDecoder} 自瓶颈层逐级上采样；每一级上采样后通过 \texttt{UpSampleBlock} 融合跳跃特征，其中即包含前一节所述注意力门控。输出层使用 $1\times1\times1$ 卷积将通道映射为类别数，并对动脉瘤二分类任务采用 Sigmoid 激活得到体素级概率。
+
+\subsubsection{损失函数与优化策略}
+训练目标采用二元交叉熵与 Dice 损失的加权组合（实现见 \texttt{combined\_loss}）：
 \begin{equation}
-\mathbf{Z}_{num}^{l+1}=Attn(\mathbf{Z}_{num}^{l},\mathbf{Z}_{cat}^{l}),\quad
-\mathbf{Z}_{cat}^{l+1}=Attn(\mathbf{Z}_{cat}^{l},\mathbf{Z}_{num}^{l}).
+\mathcal{L}_{seg} = \mathcal{L}_{BCE} + \mathcal{L}_{Dice}.
 \end{equation}
-最终对两路token池化并拼接，经全连接头输出破裂概率。该结构能够显式建模“临床变量-类别属性”之间的交互关系。
+优化器由配置 \texttt{train.optimizer} 选择 Adam、AdamW 或 SGD；学习率调度支持余弦退火、阶梯衰减或恒等映射（\texttt{train.scheduler}）。训练脚本在每个 epoch 后将标量损失写入 TensorBoard（日志位于 \texttt{log\_dir/tensorboard}），并按 \texttt{eval\_interval} 在验证集上评估 Dice，维护验证集最优权重。
 
-\subsubsection{训练与阈值优化}
-风险任务使用加权二元交叉熵损失，对类别不平衡进行修正。训练中按验证集F1进行阈值网格搜索，动态更新分类阈值；并采用基于验证损失的早停机制控制过拟合。最终在测试集报告准确率、F1和AUC等指标，输出模型权重与JSON格式评估报告。
+\subsubsection{检查点与整例推理重建}
+每次触发保存时，脚本将当前 epoch、模型参数、优化器状态及验证 Dice 序列化至磁盘：默认写入 \texttt{checkpoints/latest.pth}；若当前验证性能超过历史最优，则额外写入 \texttt{best.pth}。这一命名约定便于断点续训与部署阶段直接加载最优模型。
+
+评估与推理阶段将数据集采样模式切换为顺序遍历，对整例体积进行补丁前向，再依据空间索引将补丁预测拼接回完整三维数组；随后利用 SimpleITK 将数组写回 NIfTI，并恢复原始影像的 spacing、origin 与 direction，保证与 PACS 或 RadiAnt 等查看器对齐。系统可同时导出连续概率图与经固定阈值二值化后的掩膜，后者便于快速统计瘤体体积或作为形态学特征提取输入。
+
+\subsection{破裂风险预测模块设计}
+\subsubsection{表格数据构建与预处理}
+风险建模的数据源由配置中的 \texttt{risk.excel\_path}、标签列、标识列及可选特征列指定。管线 \texttt{build\_risk\_data\_bundle} 完成训练/验证/测试划分，并对数值与类别字段分别处理：缺失值可用列统计量填补；低频类别可合并为“其他”；数值列与类别列经互信息等方法筛选至不超过 \texttt{auto\_max\_features} 维，以降低噪声维度。配置中还包含临床先验列（如年龄、性别、既往病史等）与影像组学特征开关，便于课题后续扩展。
+
+\subsubsection{RiskCrossAttentionModel 结构}
+与“单一全连接层拼接所有字段”的浅层网络不同，本文实现的 \texttt{RiskCrossAttentionModel} 将每个数值字段映射为隐空间中的一枚 token：先通过可学习的逐维缩放与偏置校正量纲差异，再将标量经线性层投影为 $\mathbb{R}^{d_h}$ 向量。类别字段则通过各自的嵌入表映射到同一维度。若某次实验中不存在离散字段，实现中将数值 token 的均值作为占位类别 token，以避免注意力模块退化。
+
+在 token 序列层面，模型堆叠若干层“数值$\rightarrow$类别”与“类别$\rightarrow$数值”交替的 \texttt{CrossAttentionBlock}：每一层内部采用 PyTorch 的 \texttt{MultiheadAttention}，以一批 token 为 query、另一批为 key/value，经残差连接与前馈网络（FFN）更新表示，形式上与 Transformer 编码子层一致\cite{vaswani2017}。最终将数值流与类别流分别沿 token 维做均值池化，拼接后送入 LayerNorm 与两层 MLP，经 Sigmoid 得到破裂概率标量。
+
+\subsubsection{损失函数、类别加权与阈值搜索}
+训练阶段采用加权二元交叉熵：正样本权重由训练集正负样本数量比自动估计（可由 \texttt{use\_pos\_weight} 控制），以缓解破裂样本稀少带来的梯度淹没。验证阶段在固定模型参数的前提下，对验证集预测概率在 $(0.05,0.95)$ 区间内做线性阈值扫描，以宏平均 F1 为主准则选取最优阈值；测试阶段固定该阈值输出准确率、精确率、召回率与 AUC。最优模型参数与指标摘要写入 \texttt{risk\_save\_dir/risk\_cross\_attention.pt} 与 \texttt{risk\_report.json}。
+
+\subsection{Web 服务与端到端演示}
+项目提供基于 FastAPI 的轻量 Web 服务（\texttt{ui/main.py}）：支持上传 CTA 体积、调用与训练阶段一致的补丁推理流程，并可选加载训练好的风险模型对表单特征进行推断。接口层同时预留与健康检查、静态资源路由等基础能力，便于在局域网环境下向答辩评委演示“上传—分割—预测”闭环。该模块偏重工程集成，核心算法仍以前述两类训练脚本为准。
+
+\subsection{本章小结}
+本章从总体架构出发，介绍了三维 Attention U-Net 分割管线在数据层、网络层与损失层的设计选择，说明了与代码路径对应的检查点与 NIfTI 输出格式；随后阐述了表格风险模型的 token 化编码、多头交叉注意力融合及加权损失与阈值搜索策略；最后简要概括 Web 端的串联作用。下一章将围绕实验环境、评价指标与结果分析框架展开。
