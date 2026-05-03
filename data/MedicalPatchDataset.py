@@ -159,6 +159,10 @@ class MedicalPatchDataset(TorchDataset):
         We first read the image with SimpleITK, then resample it in memory to a
         consistent voxel spacing. A consistent spacing is important for 3D medical
         training because it stabilizes the physical receptive field across scans.
+
+        Labels are resampled to EXACTLY match the resampled image's geometry
+        (size, spacing, origin, direction) using Nearest-Neighbor interpolation,
+        so the two volumes are spatially aligned voxel-for-voxel.
         """
         image_itk: NiftiImage = sitk.ReadImage(case.image_path)
         img_shape = image_itk.GetSize()
@@ -167,12 +171,58 @@ class MedicalPatchDataset(TorchDataset):
         img_shape = image_itk.GetSize()
         image_np = sitk.GetArrayFromImage(image_itk).astype(np.float32)
 
+        # ── DIAGNOSTIC: log label resolution status for every case ──────────────────
+        if case.label_path is None:
+            logging.warning(
+                "label_null case=%s | image_path=%s | NO label matched "
+                "(check data.label_suffix and file existence on disk)",
+                Path(case.image_path).name,
+                case.image_path,
+            )
+        elif not os.path.exists(case.label_path):
+            logging.warning(
+                "label_missing case=%s | image_path=%s | label_path=%s | FILE NOT FOUND",
+                Path(case.image_path).name,
+                case.image_path,
+                case.label_path,
+            )
+        # ───────────────────────────────────────────────────────────────────────────
 
         label_np: Optional[np.ndarray] = None
         if case.label_path is not None:
             label_itk: NiftiImage = sitk.ReadImage(case.label_path)
-            label_itk = resample_in_memory(label_itk, self.target_spacing, is_mask=True)
+            label_orig_spacing = label_itk.GetSpacing()
+            label_orig_size = label_itk.GetSize()
+            label_orig_origin = label_itk.GetOrigin()
+            label_orig_direction = label_itk.GetDirection()
+            # Resample label to MATCH the resampled image's geometry voxel-for-voxel.
+            # Using the image's target spacing and size ensures perfect spatial alignment.
+            label_resampler = sitk.ResampleImageFilter()
+            label_resampler.SetOutputSpacing(image_itk.GetSpacing())
+            label_resampler.SetSize(image_itk.GetSize())
+            label_resampler.SetOutputDirection(image_itk.GetDirection())
+            label_resampler.SetOutputOrigin(image_itk.GetOrigin())
+            label_resampler.SetTransform(sitk.Transform())
+            label_resampler.SetInterpolator(sitk.sitkNearestNeighbor)
+            label_resampler.SetDefaultPixelValue(0)
+            label_itk = label_resampler.Execute(label_itk)
             label_np = sitk.GetArrayFromImage(label_itk).astype(np.int64)
+            label_fg_count = int((label_np > 0).sum())
+            logging.info(
+                "label_check case=%s | label_path=%s | "
+                "orig_size=%s spacing=%s origin=%s | "
+                "resampled_size=%s img_resampled_size=%s | "
+                "fg_voxels=%d fg_ratio=%.6f",
+                Path(case.image_path).name,
+                Path(case.label_path).name if case.label_path else "NONE",
+                label_orig_size,
+                label_orig_spacing,
+                label_orig_origin,
+                label_itk.GetSize(),
+                image_itk.GetSize(),
+                label_fg_count,
+                label_fg_count / max(label_np.size, 1),
+            )
 
         return image_np, label_np
 
