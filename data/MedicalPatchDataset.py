@@ -281,12 +281,35 @@ class MedicalPatchDataset(TorchDataset):
         case = self.cases[case_index]
         image, label = self._load_case(case)
         image = _normalize_image(image)
-        patches_per_vol: int = 1000
-        if sampling_mode == 'sequential':
-            patches_per_vol = 1000
 
-        selected_starts = self._select_patch_starts(image, label, sampling_mode=sampling_mode,
-                                                    patches_per_vol_input=patches_per_vol)
+        mode = (sampling_mode or self.patch_sampling_mode).lower()
+        if mode == "sequential":
+            selected_starts = self._select_patch_starts(
+                image, label, sampling_mode=sampling_mode, patches_per_vol_input=1000
+            )
+        elif mode in {"foreground_priority", "foreground_only"}:
+            # Always use random foreground-centred sampling for training modes —
+            # the fixed-grid approach frequently misses isolated/sparse lesions.
+            num_fg = max(1, self.patches_per_volume)
+            selected_starts = self._random_patch_starts_around_foreground(label, num_patches=num_fg)
+            # Fallback to sequential if label is all-zero
+            if not selected_starts:
+                logging.warning(
+                    "label all-zero for case %s; falling back to sequential sampling.",
+                    Path(case.image_path).name,
+                )
+                selected_starts = self._select_patch_starts(
+                    image, label, sampling_mode="sequential", patches_per_vol_input=1000
+                )
+            # Fill remaining slots with random background patches
+            if len(selected_starts) < self.patches_per_volume and label is not None:
+                bg_patches = self._random_background_starts(image, label, num_patches=self.patches_per_volume - len(selected_starts))
+                selected_starts += bg_patches
+        else:
+            selected_starts = self._select_patch_starts(
+                image, label, sampling_mode=sampling_mode,
+                patches_per_vol_input=self.patches_per_volume
+            )
         image_patches: list[Tensor] = []
         label_patches: list[Tensor] = []
         for start in selected_starts:
@@ -348,6 +371,18 @@ class MedicalPatchDataset(TorchDataset):
             else:
                 background_starts.append(start)
 
+        logging.info(
+            "patch_select mode=%s | total_patches=%d fg_patches=%d bg_patches=%d "
+            "| patches_per_vol=%d | image_shape=%s patch_size=%s",
+            mode,
+            len(starts),
+            len(foreground_starts),
+            len(background_starts),
+            self.patches_per_volume,
+            tuple(image.shape),
+            self.patch_size,
+        )
+
         if mode == "foreground_only":
             if not foreground_starts:
                 logging.warning(
@@ -394,6 +429,76 @@ class MedicalPatchDataset(TorchDataset):
             return selected
 
         return starts[: self.patches_per_volume if patches_per_vol_input is None else patches_per_vol_input]
+
+    def _random_patch_starts_around_foreground(
+        self,
+        label: np.ndarray,
+        num_patches: int,
+    ) -> list[tuple[int, int, int]]:
+        """Generate patch start positions by sampling centered on foreground voxels.
+
+        For each patch, pick a random foreground voxel as the centre, then add
+        a uniform random offset in [-half_patch, +half_patch) so the foreground
+        stays inside the patch.  This guarantees that every foreground voxel
+        contributes at least one training sample regardless of patch alignment.
+        """
+        fg_coords = np.argwhere(label > 0)
+        if fg_coords.size == 0:
+            return []
+
+        selected: list[tuple[int, int, int]] = []
+        d, h, w = label.shape
+        pd, ph, pw = self.patch_size
+
+        for _ in range(num_patches):
+            idx = self.rng.randrange(len(fg_coords))
+            cz, cy, cx = fg_coords[idx]
+
+            # Random offset in [-pd/2, +pd/2)
+            oz = self.rng.randint(-pd // 2, pd // 2 - 1)
+            oy = self.rng.randint(-ph // 2, ph // 2 - 1)
+            ox = self.rng.randint(-pw // 2, pw // 2 - 1)
+
+            sz = int(np.clip(cz + oz, 0, d - pd))
+            sy = int(np.clip(cy + oy, 0, h - ph))
+            sx = int(np.clip(cx + ox, 0, w - pw))
+            selected.append((sz, sy, sx))
+
+        return selected
+
+    def _random_background_starts(
+        self,
+        image: np.ndarray,
+        label: np.ndarray,
+        num_patches: int,
+    ) -> list[tuple[int, int, int]]:
+        """Sample random background patches that contain no foreground voxels."""
+        bg_coords = np.argwhere(label == 0)
+        if bg_coords.size == 0:
+            return []
+        selected: list[tuple[int, int, int]] = []
+        d, h, w = image.shape
+        pd, ph, pw = self.patch_size
+
+        seen = set()
+        attempts = 0
+        while len(selected) < num_patches and attempts < num_patches * 4:
+            attempts += 1
+            idx = self.rng.randrange(len(bg_coords))
+            bz, by, bx = bg_coords[idx]
+            oz = self.rng.randint(-pd // 2, pd // 2 - 1)
+            oy = self.rng.randint(-ph // 2, ph // 2 - 1)
+            ox = self.rng.randint(-pw // 2, pw // 2 - 1)
+            sz = int(np.clip(bz + oz, 0, max(0, d - pd)))
+            sy = int(np.clip(by + oy, 0, max(0, h - ph)))
+            sx = int(np.clip(bx + ox, 0, max(0, w - pw)))
+            key = (sz // 8, sy // 8, sx // 8)
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append((sz, sy, sx))
+
+        return selected
 
     def _pad_to_minimum_patch_shape(self, array: np.ndarray) -> np.ndarray:
         """Pad a volume so every dimension can yield at least one full patch."""
