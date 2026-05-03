@@ -195,6 +195,33 @@ class MedicalPatchDataset(TorchDataset):
             label_orig_size = label_itk.GetSize()
             label_orig_origin = label_itk.GetOrigin()
             label_orig_direction = label_itk.GetDirection()
+
+            # ── DIAGNOSTIC: verify label-vs-image spatial alignment ────────────────────
+            img_spacing = image_itk.GetSpacing()
+            img_size = image_itk.GetSize()
+            spacing_ratio = tuple(
+                max(s1, s2) / min(s1, s2) if min(s1, s2) > 1e-6 else 0.0
+                for s1, s2 in zip(label_orig_spacing, img_spacing)
+            )
+            size_ratio = tuple(
+                max(s1, s2) / min(s1, s2) if min(s1, s2) > 0 else 0.0
+                for s1, s2 in zip(label_orig_size, img_size)
+            )
+            if max(spacing_ratio) > 2.0 or max(size_ratio) > 3.0:
+                logging.warning(
+                    "label_geom_mismatch case=%s | label_spacing=%s img_spacing=%s "
+                    "| label_size=%s img_size=%s | "
+                    "spacing_ratio=%s size_ratio=%s | "
+                    ">>> LABEL AND IMAGE GEOMETRY DIFFER SIGNIFICANTLY — CHECK ALIGNMENT <<<",
+                    Path(case.image_path).name,
+                    label_orig_spacing,
+                    img_spacing,
+                    label_orig_size,
+                    img_size,
+                    spacing_ratio,
+                    size_ratio,
+                )
+            # ─────────────────────────────────────────────────────────────────────────
             # Resample label to MATCH the resampled image's geometry voxel-for-voxel.
             # Using the image's target spacing and size ensures perfect spatial alignment.
             label_resampler = sitk.ResampleImageFilter()
@@ -292,6 +319,31 @@ class MedicalPatchDataset(TorchDataset):
             # the fixed-grid approach frequently misses isolated/sparse lesions.
             num_fg = max(1, self.patches_per_volume)
             selected_starts = self._random_patch_starts_around_foreground(label, num_patches=num_fg)
+
+            # ── DIAGNOSTIC: count how many of the returned patches actually contain foreground ──
+            if selected_starts:
+                actual_fg_count = sum(
+                    1 for s in selected_starts
+                    if self._is_foreground_patch(label, s)
+                )
+                # Sample the label foreground ratio of the first returned patch for quick sanity check
+                if selected_starts:
+                    s0 = selected_starts[0]
+                    p0 = label[s0[0]:s0[0]+self.patch_size[0],
+                               s0[1]:s0[1]+self.patch_size[1],
+                               s0[2]:s0[2]+self.patch_size[2]]
+                    p0_fg = int((p0 > 0).sum())
+                    logging.warning(
+                        "patch_sampling case=%s | mode=%s | patches_generated=%d "
+                        "| patches_with_fg=%d | p0_fg_voxels=%d | label_fg_total=%d",
+                        Path(case.image_path).name,
+                        mode,
+                        len(selected_starts),
+                        actual_fg_count,
+                        p0_fg,
+                        int((label > 0).sum()) if label is not None else 0,
+                    )
+
             # Fallback to sequential if label is all-zero
             if not selected_starts:
                 logging.warning(
@@ -454,14 +506,16 @@ class MedicalPatchDataset(TorchDataset):
             idx = self.rng.randrange(len(fg_coords))
             cz, cy, cx = fg_coords[idx]
 
-            # Random offset in [-pd/2, +pd/2)
-            oz = self.rng.randint(-pd // 2, pd // 2 - 1)
-            oy = self.rng.randint(-ph // 2, ph // 2 - 1)
-            ox = self.rng.randint(-pw // 2, pw // 2 - 1)
+            # Random offset in [-pd/4, +pd/4) — tighter than pd/2 so the foreground
+            # voxel is guaranteed to stay in the central region of the patch even after
+            # clipping at image boundaries.
+            oz = self.rng.randint(-pd // 4, pd // 4 - 1)
+            oy = self.rng.randint(-ph // 4, ph // 4 - 1)
+            ox = self.rng.randint(-pw // 4, pw // 4 - 1)
 
-            sz = int(np.clip(cz + oz, 0, d - pd))
-            sy = int(np.clip(cy + oy, 0, h - ph))
-            sx = int(np.clip(cx + ox, 0, w - pw))
+            sz = int(np.clip(cz + oz, 0, max(0, d - pd)))
+            sy = int(np.clip(cy + oy, 0, max(0, h - ph)))
+            sx = int(np.clip(cx + ox, 0, max(0, w - pw)))
             selected.append((sz, sy, sx))
 
         return selected
@@ -486,9 +540,9 @@ class MedicalPatchDataset(TorchDataset):
             attempts += 1
             idx = self.rng.randrange(len(bg_coords))
             bz, by, bx = bg_coords[idx]
-            oz = self.rng.randint(-pd // 2, pd // 2 - 1)
-            oy = self.rng.randint(-ph // 2, ph // 2 - 1)
-            ox = self.rng.randint(-pw // 2, pw // 2 - 1)
+            oz = self.rng.randint(-pd // 4, pd // 4 - 1)
+            oy = self.rng.randint(-ph // 4, ph // 4 - 1)
+            ox = self.rng.randint(-pw // 4, pw // 4 - 1)
             sz = int(np.clip(bz + oz, 0, max(0, d - pd)))
             sy = int(np.clip(by + oy, 0, max(0, h - ph)))
             sx = int(np.clip(bx + ox, 0, max(0, w - pw)))
