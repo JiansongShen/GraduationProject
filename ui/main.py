@@ -8,6 +8,7 @@ import shutil
 import time
 import uuid
 from dataclasses import asdict
+from logging import DEBUG
 from pathlib import Path
 from typing import Any, cast
 
@@ -55,9 +56,10 @@ app.add_middleware(
 ARGS = parse_args()
 STATE: dict[str, Any] = {"config_path": str(Path(ARGS.config).expanduser()), "config": None}
 logger = logging.getLogger("gradulate.api")
+
 if not logger.handlers:
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
 

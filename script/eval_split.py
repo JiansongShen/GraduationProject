@@ -72,7 +72,8 @@ def evaluate(
             batch_labels = align_target_shape(outputs, batch_labels)
             loss = combined_loss(outputs, batch_labels)
 
-            output_prob = torch.sigmoid(outputs)
+            # Model forward ends with Sigmoid — outputs are already a probability map.
+            output_prob = outputs
             pred_binary = (output_prob > 0.5).float()
             output_min = float(output_prob.min().item())
             output_max = float(output_prob.max().item())
@@ -219,7 +220,7 @@ def evaluate_full_pipeline(
             batch_labels = align_target_shape(outputs, batch_labels)
             loss = combined_loss(outputs, batch_labels)
 
-            output_prob = torch.sigmoid(outputs)
+            output_prob = outputs
             pred_binary = (output_prob > 0.5).float()
             dice = 1.0 - dice_loss(output_prob, batch_labels)
 

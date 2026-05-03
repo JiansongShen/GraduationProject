@@ -12,7 +12,6 @@ from typing import Any, Callable
 import numpy as np
 import SimpleITK as sitk
 import torch
-from torch.nn.functional import binary_cross_entropy
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -27,7 +26,13 @@ from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
 from script.eval_split import evaluate
-from script.eval_utils import align_target_shape, combine_to_nifti, combined_loss, dice_loss, sequential_patch_prediction
+from script.eval_utils import (
+    align_target_shape,
+    combine_to_nifti,
+    combined_loss_with_parts,
+    dice_loss,
+    sequential_patch_prediction,
+)
 from script.common import setup_basic_logging
 
 
@@ -183,9 +188,9 @@ def train_one_epoch(
             batch_labels = labels[patch_start_idx:patch_end_idx].float().to(device)
 
             optimizer.zero_grad()
-            outputs = model(batch_images)
+            outputs = model(batch_images)  # probability map (decoder ends with Sigmoid)
             batch_labels = align_target_shape(outputs, batch_labels)
-            loss = binary_cross_entropy(outputs, batch_labels)
+            loss, bce_term, dice_term = combined_loss_with_parts(outputs, batch_labels)
 
             loss.backward()
             optimizer.step()
@@ -207,6 +212,20 @@ def train_one_epoch(
 
             if num_batches % 10 == 0:
                 writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
+
+            if num_batches % 50 == 0:
+                logging.info(
+                    "train_diag global_patch_step=%s | loss=%.5f bce=%.5f dice_loss=%.5f | "
+                    "pred_mean=%.6f pred_min=%.6f pred_max=%.6f | label_fg_ratio=%.6f",
+                    num_batches,
+                    loss.item(),
+                    bce_term.item(),
+                    dice_term.item(),
+                    float(outputs.detach().mean().cpu()),
+                    float(outputs.detach().min().cpu()),
+                    float(outputs.detach().max().cpu()),
+                    float(batch_labels.detach().mean().cpu()),
+                )
 
     if save_training_prediction and prediction_dir is not None:
         try:
@@ -334,9 +353,10 @@ def main() -> None:
     model: torch.nn.Module = build_model(cfg, device)
     logging.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
-    # Build optimizer and scheduler
+    # Build optimizer and scheduler (scheduler must be stepped each epoch — see training loop)
     optimizer = build_optimizer(model, cfg)
-    
+    scheduler = build_scheduler(optimizer, cfg, cfg.train.epochs)
+
     # Setup datasets and dataloaders
     logging.info("Setting up datasets...")
     patch_size = tuple(cfg.train.patch_size)
@@ -403,7 +423,14 @@ def main() -> None:
             prediction_dir=prediction_dir / "train",
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
-        
+        writer.add_scalar("LR/train", optimizer.param_groups[0]["lr"], epoch)
+
+        # Learning-rate schedule: delay scheduler.step until after warmup_epochs (config-only;
+        # LR warmup ramp is not implemented — only skip cosine/step LR decay during warmup).
+        sched_name = cfg.train.scheduler.lower()
+        if sched_name != "none" and epoch >= cfg.train.warmup_epochs:
+            scheduler.step()
+
         # Evaluate
         if (epoch + 1) % cfg.eval_interval == 0:
             val_dice = evaluate(
@@ -431,11 +458,6 @@ def main() -> None:
                 checkpoint_dir,
                 is_best
             )
-        
-        # Step scheduler (if using warmup, handle it here)
-        if epoch >= cfg.train.warmup_epochs:
-            # Scheduler stepping logic would go here
-            pass
         
         # Periodic checkpoint saving
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:

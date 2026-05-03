@@ -12,6 +12,7 @@ from pathlib import Path
 
 import SimpleITK as sitk
 import torch
+import torch.nn.functional as F
 
 from data.MedicalPatchDataset import MedicalPatchDataset
 from data.data_preprocesser import resample_in_memory
@@ -27,17 +28,25 @@ def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) ->
     return 1.0 - dice_coeff
 
 
-def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Stable segmentation loss built from logits.
-
-    We use BCEWithLogitsLoss so the model can emit raw logits without an extra
-    sigmoid in the forward pass. Dice still operates on probabilities derived
-    from those logits.
-    """
-    bce = torch.nn.functional.binary_cross_entropy_with_logits(pred, target)
-    pred_prob = torch.sigmoid(pred)
+def combined_loss_with_parts(
+    pred_prob: torch.Tensor, target: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Returns ``(combined_loss, bce, dice_loss_value)`` for logging/diagnostics."""
+    bce = F.binary_cross_entropy(pred_prob, target)
     dice = dice_loss(pred_prob, target)
-    return (bce + dice) / 2
+    total = (bce + dice) / 2
+    return total, bce, dice
+
+
+def combined_loss(pred_prob: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Mean of voxel-wise BCE and Dice on probability maps.
+
+    ``AttentionUnet`` ends with ``Sigmoid`` (``UnetDecoder``), so ``pred_prob``
+    is already in ``(0, 1)``. No extra ``sigmoid`` here — that would mean
+    treating probabilities as logits or applying sigmoid twice to logits.
+    """
+    total, _, _ = combined_loss_with_parts(pred_prob, target)
+    return total
 
 
 def align_target_shape(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -79,18 +88,18 @@ def sequential_patch_prediction(
         for patch_start in range(0, patch_count, batch_size):
             patch_end = min(patch_start + batch_size, patch_count)
             batch_images = images[patch_start:patch_end].to(device)
-            logits = model(batch_images)
+            prob_map = model(batch_images)
             logging.debug(
-                "seq-predict batch=%s:%s logits shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
+                "seq-predict batch=%s:%s prob_map shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
                 patch_start,
                 patch_end,
-                tuple(logits.shape),
-                logits.dtype,
-                float(logits.min().item()),
-                float(logits.max().item()),
-                float(logits.mean().item()),
+                tuple(prob_map.shape),
+                prob_map.dtype,
+                float(prob_map.min().item()),
+                float(prob_map.max().item()),
+                float(prob_map.mean().item()),
             )
-            probabilities = logits.detach().cpu()
+            probabilities = prob_map.detach().cpu()
             logging.debug(
                 "seq-predict batch=%s:%s prob shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
                 patch_start,
