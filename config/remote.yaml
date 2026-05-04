@@ -72,7 +72,7 @@ checkpoint:
   max_keep: 5
 
 risk:
-  enabled: false
+  enabled: true
   excel_path: "/home/napbad/project/graduate_proj/core_model/dataset/data.xlsx"
   label_column: "破裂"
   id_column: "7lesion_id"
@@ -107,3 +107,16 @@ device: "cuda"
 seed: 42
 log_dir: "logs"
 eval_interval: 5
+
+overlap_inference:
+  enabled: true
+  # Overlapping patch inference for reduced boundary artifacts
+  patch_size: [128, 128, 128]    # Full patch size (should match training patch_size)
+  effective_size: [96, 96, 96]   # Center region kept for output; stride = effective_size
+  # effective_size: [64, 64, 64] # Alternative: more overlap, more robust edges
+  padding_mode: "reflect"        # Boundary padding: "reflect" (recommended), "constant"
+  padding_value: 0.0             # Fill value for constant padding
+  blend_mode: "gaussian"          # Blending: "gaussian" (recommended) or "average"
+  gaussian_sigma: 0.4            # Gaussian sigma (relative to effective_size)
+  use_amp: true                  # Enable automatic mixed precision (FP16)
+  batch_size: 2                  # Inference batch size (smaller for larger patches)

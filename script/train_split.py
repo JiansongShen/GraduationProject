@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Training script for 3D medical image segmentation with configurable models."""
+"""Training script for 3D medical image segmentation."""
 
 import argparse
 import dataclasses
@@ -7,16 +7,10 @@ import logging
 import sys
 from logging import DEBUG
 from pathlib import Path
-from typing import Any, Callable
 
-import numpy as np
-import SimpleITK as sitk
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
-# Add project root to path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -25,453 +19,122 @@ from core.config_loader import load_config
 from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
-from script.eval_split import evaluate
-from script.eval_utils import (
-    align_target_shape,
-    combine_to_nifti,
-    combined_loss_with_parts,
-    dice_loss,
-    sequential_patch_prediction,
+from script._training import (
+    build_optimizer,
+    build_scheduler,
+    load_checkpoint,
+    save_checkpoint,
+    train_one_epoch,
+    validate,
 )
 from script.common import setup_basic_logging
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Train 3D medical image segmentation model"
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        required=True,
-        help="Path to YAML configuration file (e.g., config/host.yaml)"
-    )
-    parser.add_argument(
-        "--resume",
-        type=str,
-        default=None,
-        help="Path to checkpoint to resume training from"
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default=None,
-        help="Override device from config (cuda/cpu)"
-    )
+    parser = argparse.ArgumentParser(description="Train 3D medical image segmentation model")
+    parser.add_argument("--config", type=str, required=True, help="Path to YAML configuration file")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training")
+    parser.add_argument("--device", type=str, default=None, help="Override device (cuda/cpu)")
     return parser.parse_args()
 
 
 def build_model(cfg: Config, device: torch.device) -> AttentionUnet:
-    """Build model based on configuration."""
-    # Currently using AttentionUnet - can be extended to support multiple models
-    logging.info(f"build a model: depth: {cfg.model.depth}")
     model = AttentionUnet(
         in_ch=cfg.model.in_channels,
         out_ch=cfg.model.out_channels,
         depth=cfg.model.depth,
-        base_filter=cfg.model.base_filters, 
+        base_filter=cfg.model.base_filters,
         norm_type=cfg.model.norm_type,
         activation=cfg.model.activation,
-        dropout=cfg.model.dropout
+        dropout=cfg.model.dropout,
     )
-    
-    model = model.to(device)
-    
-    # Optional: compile model for faster training (PyTorch 2.0+)
-    # if cfg.compile.enabled and hasattr(torch, 'compile'):
-    #     logging.info(f"Compiling model with mode: {cfg.compile.mode}")
-    #     model = torch.compile(model, mode=cfg.compile.mode, fullgraph=cfg.compile.fullgraph)
-    #
-    return model
-
-
-def build_optimizer(model: torch.nn.Module, cfg: Config) -> torch.optim.Optimizer:
-    """Build optimizer based on configuration."""
-    if cfg.train.optimizer.lower() == "adam":
-        return torch.optim.Adam(
-            model.parameters(),
-            lr=cfg.train.learning_rate,
-            weight_decay=cfg.train.weight_decay
-        )
-    elif cfg.train.optimizer.lower() == "adamw":
-        return torch.optim.AdamW(
-            model.parameters(),
-            lr=cfg.train.learning_rate,
-            weight_decay=cfg.train.weight_decay
-        )
-    elif cfg.train.optimizer.lower() == "sgd":
-        return torch.optim.SGD(
-            model.parameters(),
-            lr=cfg.train.learning_rate,
-            weight_decay=cfg.train.weight_decay,
-            momentum=0.9
-        )
-    else:
-        raise ValueError(f"Unsupported optimizer: {cfg.train.optimizer}")
-
-
-def build_scheduler(optimizer: torch.optim.Optimizer, cfg: Config, total_epochs: int) -> CosineAnnealingLR | StepLR | LambdaLR:
-    """Build learning rate scheduler based on configuration."""
-    if cfg.train.scheduler.lower() == "cosine":
-        return torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=total_epochs - cfg.train.warmup_epochs,
-            eta_min=1e-6
-        )
-    elif cfg.train.scheduler.lower() == "step":
-        return torch.optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=total_epochs // 3,
-            gamma=0.1
-        )
-    elif cfg.train.scheduler.lower() == "none":
-        return torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0)
-    else:
-        raise ValueError(f"Unsupported scheduler: {cfg.train.scheduler}")
-
-def train_one_epoch(
-    model: torch.nn.Module,
-    dataset: MedicalPatchDataset,
-    optimizer: torch.optim.Optimizer,
-    device: torch.device,
-    epoch: int,
-    writer: SummaryWriter,
-    cfg: Config,
-    *,
-    save_training_prediction: bool = False,
-    prediction_dir: Path | None = None,
-) -> float:
-    """Train for one epoch by loading one case at a time."""
-    model.train()
-    epoch_loss = 0.0
-    num_batches = 0
-
-    total_volumes = len(dataset)
-    logging.debug("Epoch %s training started: total_volumes=%s", epoch + 1, total_volumes)
-
-    for batch_idx in range(total_volumes):
-        logging.debug("Epoch %s volume %s/%s loading", epoch + 1, batch_idx + 1, total_volumes)
-
-        images, labels = dataset[batch_idx]
-
-        if labels is None:
-            logging.warning("Epoch %s volume %s/%s has no labels. Skipping.", epoch + 1, batch_idx + 1, total_volumes)
-            continue
-
-        if save_training_prediction and batch_idx == 0 and prediction_dir is not None:
-            logging.info(
-                "Epoch %s first training case | image_shape=%s label_shape=%s patches=%s",
-                epoch + 1,
-                tuple(images.shape),
-                tuple(labels.shape),
-                int(images.shape[0]),
-            )
-
-        patch_count = int(images.shape[0])
-        logging.debug(
-            "Epoch %s volume %s/%s loaded: patches=%s image_shape=%s label_shape=%s",
-            epoch + 1,
-            batch_idx + 1,
-            total_volumes,
-            patch_count,
-            tuple(images.shape),
-            tuple(labels.shape),
-        )
-
-        # Process patches in batches
-        batch_size = cfg.train.batch_size
-        for patch_start_idx in range(0, patch_count, batch_size):
-            patch_end_idx = min(patch_start_idx + batch_size, patch_count)
-            
-            batch_images = images[patch_start_idx:patch_end_idx].to(device)
-            batch_labels = labels[patch_start_idx:patch_end_idx].float().to(device)
-
-            optimizer.zero_grad()
-            outputs = model(batch_images)  # probability map (decoder ends with Sigmoid)
-            batch_labels = align_target_shape(outputs, batch_labels)
-            loss, bce_term, dice_term = combined_loss_with_parts(outputs, batch_labels)
-
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.item()
-            num_batches += 1
-            avg_loss = epoch_loss / num_batches
-            logging.debug(
-                "Epoch %s volume %s/%s patch batch %s-%s done: loss=%.6f avg_loss=%.6f global_patch_step=%s",
-                epoch + 1,
-                batch_idx + 1,
-                total_volumes,
-                patch_start_idx + 1,
-                patch_end_idx,
-                loss.item(),
-                avg_loss,
-                num_batches,
-            )
-
-            if num_batches % 10 == 0:
-                writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
-
-            if num_batches % 50 == 0:
-                logging.info(
-                    "train_diag global_patch_step=%s | loss=%.5f bce=%.5f dice_loss=%.5f | "
-                    "pred_mean=%.6f pred_min=%.6f pred_max=%.6f | label_fg_ratio=%.6f",
-                    num_batches,
-                    loss.item(),
-                    bce_term.item(),
-                    dice_term.item(),
-                    float(outputs.detach().mean().cpu()),
-                    float(outputs.detach().min().cpu()),
-                    float(outputs.detach().max().cpu()),
-                    float(batch_labels.detach().mean().cpu()),
-                )
-
-    if save_training_prediction and prediction_dir is not None:
-        try:
-            probability_patches, src_shape, case_path, spacing, direction, origin = sequential_patch_prediction(
-                model,
-                dataset,
-                case_index=0,
-                device=device,
-                batch_size=max(1, cfg.train.batch_size),
-            )
-            logging.debug(
-                "training preview case=%s patch_count=%s src_shape=%s spacing=%s",
-                case_path.name,
-                len(probability_patches),
-                src_shape,
-                spacing,
-            )
-            probability_nifti = combine_to_nifti(
-                probability_patches,
-                dataset.patch_size,
-                src_shape,
-                binarize=False,
-                nifti_path=case_path,
-            )
-            logging.debug(
-                "training preview saved image geometry before metadata overwrite size=%s spacing=%s origin=%s",
-                probability_nifti.GetSize(),
-                probability_nifti.GetSpacing(),
-                probability_nifti.GetOrigin(),
-            )
-            source_image = sitk.ReadImage(str(case_path))
-            probability_nifti.CopyInformation(source_image)
-
-            prediction_dir.mkdir(parents=True, exist_ok=True)
-            output_path = prediction_dir / f"epoch_{epoch + 1:04d}_case_{case_path.name}_train_probability.nii.gz"
-            sitk.WriteImage(probability_nifti, str(output_path))
-            logging.info("Saved training prediction for first case to %s", output_path)
-        except Exception:
-            logging.exception("Failed to save training prediction for epoch %s", epoch + 1)
-
-    return epoch_loss / max(num_batches, 1)
-
-
-def save_checkpoint(
-    model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer,
-    epoch: int,
-    dice_score: float,
-    checkpoint_dir: Path,
-    is_best: bool = False
-) -> None:
-    """Save model checkpoint."""
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    
-    checkpoint = {
-        "epoch": epoch,
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "dice_score": dice_score,
-    }
-    
-    # Save latest checkpoint
-    latest_path = checkpoint_dir / "latest.pth"
-    torch.save(checkpoint, latest_path)
-    logging.info(f"Saved latest checkpoint to {latest_path}")
-    
-    # Save best checkpoint
-    if is_best:
-        best_path = checkpoint_dir / "best.pth"
-        torch.save(checkpoint, best_path)
-        logging.info(f"Saved best checkpoint to {best_path} (Dice: {dice_score:.4f})")
-
-
-def load_checkpoint(
-    checkpoint_path: str,
-    model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer
-) -> tuple[int, float]:
-    """Load model checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    logging.info(f"Loaded checkpoint from {checkpoint_path} (epoch: {checkpoint['epoch']})")
-    return checkpoint["epoch"], checkpoint.get("dice_score", 0.0)
+    return model.to(device)
 
 
 def main() -> None:
-    """Main training function."""
-    # Parse arguments
     args = parse_args()
     logging.basicConfig(level=DEBUG)
-    
-    # Load configuration
+
     config_path = Path(args.config)
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    
     cfg = load_config(config_path)
-    
-    # Override device if specified
     if args.device:
         cfg.device = args.device
-    
-    # Initialize system settings (random seeds, etc.)
+
     SystemSetting.set_seed(cfg.seed)
 
-    
-    # Setup logging
     log_dir = Path(cfg.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
-    
     setup_basic_logging(log_dir / "training.log")
-    
-    logging.info(f"Configuration loaded from: {config_path}")
-    logging.info(f"Model: {cfg.model.name}")
-    logging.info(f"Device: {cfg.device}")
-    
-    # Setup device
-    device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
-    logging.info(f"Using device: {device}")
-    
-    # Build model
-    logging.info("Building model...")
-    model: torch.nn.Module = build_model(cfg, device)
-    logging.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
-    # Build optimizer and scheduler (scheduler must be stepped each epoch — see training loop)
-    optimizer = build_optimizer(model, cfg)
-    scheduler = build_scheduler(optimizer, cfg, cfg.train.epochs)
 
-    # Setup datasets and dataloaders
-    logging.info("Setting up datasets...")
-    patch_size = tuple(cfg.train.patch_size)
-    
-    train_dataset = MedicalPatchDataset(
-        cfg=cfg.data,
-        patch_size=patch_size,
-        seed=cfg.seed
+    logging.info("Config: %s, Device: %s", config_path, cfg.device)
+    device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
+
+    # Model
+    model = build_model(cfg, device)
+    logging.info("Model parameters: %d", sum(p.numel() for p in model.parameters()))
+
+    # Optimizer and scheduler
+    optimizer = build_optimizer(
+        model,
+        lr=cfg.train.learning_rate,
+        weight_decay=cfg.train.weight_decay,
+        optimizer=cfg.train.optimizer,
     )
-    
+    scheduler = build_scheduler(
+        optimizer, cfg.train.scheduler, cfg.train.epochs, cfg.train.warmup_epochs
+    )
+
+    # Datasets
+    patch_size = tuple(cfg.train.patch_size)
+    train_dataset = MedicalPatchDataset(cfg=cfg.data, patch_size=patch_size, seed=cfg.seed)
+
     eval_data_cfg = cfg.data
     if cfg.data.eval_dirs:
         eval_data_cfg = dataclasses.replace(cfg.data, train_dirs=list(cfg.data.eval_dirs))
-        logging.info("Using dedicated eval dirs: %s", cfg.data.eval_dirs)
-    else:
-        logging.warning(
-            "No eval_dirs configured under data.eval_dirs; validation will reuse train_dirs."
-        )
-
     eval_data_cfg.patch_sampling_mode = "sequential"
     eval_data_cfg.max_load = 10000
     eval_data_cfg.patches_per_volume = 64
+    val_dataset = MedicalPatchDataset(cfg=eval_data_cfg, patch_size=patch_size, seed=cfg.seed + 1)
 
-    val_dataset = MedicalPatchDataset(
-        cfg=eval_data_cfg,
-        patch_size=patch_size,
-        seed=cfg.seed + 1
-    )
-    
-    logging.info(f"Training samples: {len(train_dataset)}")
-    logging.info(f"Validation samples: {len(val_dataset)}")
-    
-    # Setup TensorBoard
-    writer = SummaryWriter(log_dir=(log_dir / "tensorboard").__str__())
-    
-    # Resume from checkpoint if specified
-    start_epoch = 0
-    best_dice = 0.0
-    
+    logging.info("Training samples: %d, Validation samples: %d", len(train_dataset), len(val_dataset))
+
+    writer = SummaryWriter(log_dir=str(log_dir / "tensorboard"))
+    checkpoint_dir = Path(cfg.checkpoint.save_dir)
+
+    start_epoch, best_dice = 0, 0.0
     if args.resume:
         start_epoch, best_dice = load_checkpoint(args.resume, model, optimizer)
-        logging.info(f"Resuming training from epoch {start_epoch}")
-    
-    # Training loop
-    logging.info("Starting training...")
-    best_dice = max(best_dice, 0.0)
-    
-    checkpoint_dir = Path(cfg.checkpoint.save_dir)
-    prediction_dir = checkpoint_dir / "predictions"
+        logging.info("Resuming from epoch %d", start_epoch)
 
-    # progress bar
-    progress_bar = tqdm(range(start_epoch, cfg.train.epochs), desc="Training", initial=start_epoch, total=cfg.train.epochs)
-    for epoch in progress_bar:
-        # Train
+    logging.info("Starting training for %d epochs...", cfg.train.epochs)
+    for epoch in range(start_epoch, cfg.train.epochs):
         train_loss = train_one_epoch(
-            model,
-            train_dataset,
-            optimizer,
-            device,
-            epoch,
-            writer,
-            cfg=cfg,
-            save_training_prediction=True,
-            prediction_dir=prediction_dir / "train",
+            model, train_dataset, optimizer, device, epoch, writer,
+            batch_size=cfg.train.batch_size, log_interval=10
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
         writer.add_scalar("LR/train", optimizer.param_groups[0]["lr"], epoch)
 
-        # Learning-rate schedule: delay scheduler.step until after warmup_epochs (config-only;
-        # LR warmup ramp is not implemented — only skip cosine/step LR decay during warmup).
-        sched_name = cfg.train.scheduler.lower()
-        if sched_name != "none" and epoch >= cfg.train.warmup_epochs:
+        if cfg.train.scheduler.lower() != "none" and epoch >= cfg.train.warmup_epochs:
             scheduler.step()
 
-        # Evaluate
         if (epoch + 1) % cfg.eval_interval == 0:
-            val_dice = evaluate(
-                model,
-                val_dataset,
-                device,
-                epoch,
-                writer,
-                prediction_dir=prediction_dir / "eval",
-                cfg=cfg,  # Pass the config
-                store_single_res=True,
+            val_dice = validate(
+                model, val_dataset, device, epoch, writer,
+                batch_size=cfg.train.batch_size
             )
-            
-            # Check if best model
             is_best = val_dice > best_dice
             if is_best:
                 best_dice = val_dice
-            
-            # Save checkpoint
-            save_checkpoint(
-                model,
-                optimizer,
-                epoch + 1,
-                val_dice,
-                checkpoint_dir,
-                is_best
-            )
-        
-        # Periodic checkpoint saving
+            save_checkpoint(model, optimizer, epoch + 1, val_dice, checkpoint_dir, is_best)
+
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:
-            save_checkpoint(
-                model,
-                optimizer,
-                epoch + 1,
-                best_dice,
-                checkpoint_dir,
-                is_best=False
-            )
-    
-    # Final evaluation
-    logging.info(f"Training completed! Best Dice: {best_dice:.4f}")
+            save_checkpoint(model, optimizer, epoch + 1, best_dice, checkpoint_dir, is_best=False)
+
+    logging.info("Training completed! Best Dice: %.4f", best_dice)
     writer.close()
 
 

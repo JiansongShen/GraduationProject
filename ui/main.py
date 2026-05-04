@@ -345,7 +345,10 @@ def _extract_radiomics_features(cta_path: Path, mask_path: Path | None, risk_cfg
 def _align_numeric_features(df: pd.DataFrame, columns: list[str]) -> np.ndarray:
     aligned = pd.DataFrame(index=df.index)
     for col in columns:
-        aligned[col] = pd.to_numeric(df.get(col, 0), errors="coerce").fillna(0.0)
+        if col in df.columns:
+            aligned[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        else:
+            aligned[col] = 0.0
     x = aligned.to_numpy(dtype=np.float32)
     if x.ndim == 1:
         x = x.reshape(1, -1)

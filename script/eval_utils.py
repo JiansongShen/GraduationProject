@@ -9,6 +9,7 @@ loss definitions.
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 import SimpleITK as sitk
 import torch
@@ -16,6 +17,9 @@ import torch.nn.functional as F
 
 from data.MedicalPatchDataset import MedicalPatchDataset
 from data.data_preprocesser import resample_in_memory
+
+if TYPE_CHECKING:
+    from script.overlap_inference import OverlapInferenceConfig
 
 
 def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
@@ -82,40 +86,20 @@ def sequential_patch_prediction(
         raise ValueError(f"No sequential patches available for case: {case.image_path}")
 
     probability_patches: list[torch.Tensor] = []
-    model_was_training = model.training
-    model.eval()
+
     with torch.no_grad():
         for patch_start in range(0, patch_count, batch_size):
             patch_end = min(patch_start + batch_size, patch_count)
             batch_images = images[patch_start:patch_end].to(device)
-            prob_map = model(batch_images)
-            logging.debug(
-                "seq-predict batch=%s:%s prob_map shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
-                patch_start,
-                patch_end,
-                tuple(prob_map.shape),
-                prob_map.dtype,
-                float(prob_map.min().item()),
-                float(prob_map.max().item()),
-                float(prob_map.mean().item()),
-            )
-            probabilities = prob_map.detach().cpu()
-            logging.debug(
-                "seq-predict batch=%s:%s prob shape=%s dtype=%s min=%.6f max=%.6f mean=%.6f",
-                patch_start,
-                patch_end,
-                tuple(probabilities.shape),
-                probabilities.dtype,
-                float(probabilities.min().item()),
-                float(probabilities.max().item()),
-                float(probabilities.mean().item()),
-            )
-            for output_tensor in probabilities:
+            prob_map = model(batch_images).detach().cpu()
+            for output_tensor in prob_map:
+                while output_tensor.ndim > 4:
+                    output_tensor = output_tensor[0]
+                if output_tensor.ndim == 4:
+                    output_tensor = output_tensor[0]  # Remove channel dim
                 probability_patches.append(output_tensor)
-    if model_was_training:
-        model.train()
 
-    shape: tuple[int, int, int] = image_tensor.shape
+    shape: tuple[int, int, int] = tuple(int(d) for d in image_tensor.shape)
 
     return (
         probability_patches,
@@ -124,6 +108,70 @@ def sequential_patch_prediction(
         original_spacing,
         original_direction,
         original_origin,
+    )
+
+
+def overlap_patch_prediction(
+    model: torch.nn.Module,
+    dataset: MedicalPatchDataset,
+    *,
+    case_index: int,
+    device: torch.device,
+    overlap_config: "OverlapInferenceConfig",
+) -> tuple[torch.Tensor, tuple[int, int, int], Path, tuple[float, float, float], tuple[float, ...], tuple[float, float, float], dict]:
+    """Run overlapping patch inference for one case with Gaussian-weighted blending.
+
+    Args:
+        model: 分割模型
+        dataset: 医疗图像数据集
+        case_index: 病例索引
+        device: 计算设备
+        overlap_config: 重叠推理配置
+
+    Returns:
+        (prediction, source_shape, image_path, original_spacing, original_direction, original_origin, stats)
+    """
+    from script.overlap_inference import predict_with_overlap as _predict_overlap
+
+    case = dataset.cases[case_index]
+    original_image = sitk.ReadImage(case.image_path)
+    original_spacing = original_image.GetSpacing()
+    original_direction = original_image.GetDirection()
+    original_origin = original_image.GetOrigin()
+
+    image_tensor, _ = dataset.get_src_item(case_index)
+    source_shape = tuple(int(d) for d in image_tensor.shape)
+
+    # 转换为 [1, 1, D, H, W] 格式
+    input_tensor = image_tensor.unsqueeze(0).unsqueeze(0).float()
+
+    model.eval()
+    with torch.no_grad():
+        prediction = _predict_overlap(
+            model=model,
+            image=input_tensor,
+            config=overlap_config,
+            device=device,
+        )
+
+    # 收集统计信息
+    pred_np = prediction.squeeze().cpu().numpy()
+    stats = {
+        "prob_min": float(pred_np.min()),
+        "prob_max": float(pred_np.max()),
+        "prob_mean": float(pred_np.mean()),
+        "prob_std": float(pred_np.std()),
+        "inference_mode": "overlap",
+    }
+
+    return (
+        prediction.squeeze(0),  # [1, D, H, W] -> [D, H, W]
+        source_shape,
+        Path(case.image_path),
+        original_spacing,
+        original_direction,
+        original_origin,
+        stats,
     )
 
 
@@ -281,3 +329,98 @@ def combine_to_nifti(
         binarize=binarize,
     )
     return restore_prediction_to_source_grid(resampled_prediction, source_image, binarize=binarize)
+
+
+def stitch_overlapping_patches(
+    patch_predictions: torch.Tensor,
+    source_shape: tuple[int, int, int],
+    patch_size: tuple[int, int, int],
+    effective_size: tuple[int, int, int],
+    weight_map: Optional[torch.Tensor] = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Stitch overlapping patches with Gaussian-weighted blending.
+
+    这个函数用于直接拼接从模型输出的 overlapping patches。
+    与 stitch_probability_patches 的区别是:
+    - 原始 stitch_probability_patches 假设 patches 之间没有 overlap
+    - 这个函数处理带有 overlap 的情况, 使用高斯权重融合
+
+    Args:
+        patch_predictions: Patch 预测结果, shape [N, 1, D, H, W] 或 [N, D, H, W]
+        source_shape: 源体积形状 (D, H, W)
+        patch_size: Patch 总尺寸
+        effective_size: 有效预测区域尺寸
+        weight_map: 可选的预计算权重图, shape 同 effective_size
+
+    Returns:
+        (fused_prediction, weight_sum): 融合后的预测和权重累加图
+    """
+    # 处理输入形状
+    if patch_predictions.ndim == 4:
+        patch_predictions = patch_predictions.unsqueeze(1)  # [N, 1, D, H, W]
+
+    num_patches = patch_predictions.shape[0]
+
+    # 计算偏移量
+    offset_d = (patch_size[0] - effective_size[0]) // 2
+    offset_h = (patch_size[1] - effective_size[1]) // 2
+    offset_w = (patch_size[2] - effective_size[2]) // 2
+
+    # 创建累加器
+    fused = torch.zeros(source_shape, dtype=torch.float32)
+    weight_sum = torch.zeros(source_shape, dtype=torch.float32)
+
+    # 创建或使用权重图
+    if weight_map is None:
+        weight_map = torch.ones(effective_size, dtype=torch.float32)
+    elif weight_map.shape != effective_size:
+        raise ValueError(
+            f"weight_map shape {weight_map.shape} must match effective_size {effective_size}"
+        )
+
+    # 生成 patch 位置
+    from script.overlap_inference import generate_overlap_patch_positions
+    patch_starts, _ = generate_overlap_patch_positions(
+        source_shape,
+        patch_size,
+        effective_size,
+        stride=effective_size,
+        padding_mode="none",
+    )
+
+    # 累加
+    for i, (z, y, x) in enumerate(patch_starts):
+        if i >= num_patches:
+            break
+
+        pred = patch_predictions[i]
+        while pred.ndim > 3:
+            pred = pred[0]
+        if pred.ndim == 3:
+            pred = pred[0]  # Remove channel
+
+        # 提取有效区域
+        effective_pred = pred[
+            offset_d : offset_d + effective_size[0],
+            offset_h : offset_h + effective_size[1],
+            offset_w : offset_w + effective_size[2],
+        ]
+
+        # 累加
+        fused[
+            z : z + effective_size[0],
+            y : y + effective_size[1],
+            x : x + effective_size[2],
+        ] += effective_pred * weight_map
+
+        weight_sum[
+            z : z + effective_size[0],
+            y : y + effective_size[1],
+            x : x + effective_size[2],
+        ] += weight_map
+
+    # 归一化
+    weight_sum = weight_sum.clamp(min=1e-8)
+    fused = fused / weight_sum
+
+    return fused, weight_sum

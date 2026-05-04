@@ -93,3 +93,16 @@ device: "cuda"
 seed: 42
 log_dir: "logs"
 eval_interval: 50
+
+overlap_inference:
+  enabled: true
+  # Overlapping patch inference for reduced boundary artifacts
+  patch_size: [64, 64, 64]        # Full patch size (should match training patch_size)
+  effective_size: [48, 48, 48]   # Center region kept for output; stride = effective_size
+  # effective_size: [32, 32, 32] # Alternative: more overlap, more robust edges
+  padding_mode: "reflect"         # Boundary padding: "reflect" (recommended), "constant"
+  padding_value: 0.0               # Fill value for constant padding
+  blend_mode: "gaussian"          # Blending: "gaussian" (recommended) or "average"
+  gaussian_sigma: 0.4             # Gaussian sigma (relative to effective_size)
+  use_amp: true                   # Enable automatic mixed precision (FP16)
+  batch_size: 4                   # Inference batch size
