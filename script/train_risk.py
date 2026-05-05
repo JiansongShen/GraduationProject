@@ -169,6 +169,20 @@ def main() -> None:
         len(bundle.numeric_columns),
         len(bundle.categorical_columns),
     )
+    selected_numeric_columns = [c for c in bundle.numeric_columns if c != "__dummy_numeric__"]
+    selected_categorical_columns = list(bundle.categorical_columns)
+    selected_total_columns = len(selected_numeric_columns) + len(selected_categorical_columns)
+    logging.info(
+        "Selected training columns | total=%d clinic+categorical=%d numeric/radiomics=%d",
+        selected_total_columns,
+        len(selected_categorical_columns),
+        len(selected_numeric_columns),
+    )
+    logging.info(
+        "Selected column preview | categorical=%s | numeric=%s",
+        selected_categorical_columns[:20],
+        selected_numeric_columns[:20],
+    )
 
     train_set = RiskTabularDataset(bundle.x_num_train, bundle.x_cat_train, bundle.y_train)
     val_set = RiskTabularDataset(bundle.x_num_val, bundle.x_cat_val, bundle.y_val)

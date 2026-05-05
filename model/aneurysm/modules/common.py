@@ -2,14 +2,8 @@ from torch import nn
 
 
 def _map_norm_layer(norm_type: str, out_ch: int) -> nn.Module:
-    if norm_type == "batch":
-        return nn.BatchNorm3d(out_ch)
-    elif norm_type == "instance":
-        return nn.InstanceNorm3d(out_ch)
-    elif norm_type == "group":
-        return nn.GroupNorm(out_ch // 8, out_ch)
-    else:
-        raise ValueError("Unsupported normal type")
+    _ = norm_type
+    return nn.InstanceNorm3d(out_ch)
 
 def _map_layer_activation(activation: str) -> nn.Module:
     if activation == "relu":

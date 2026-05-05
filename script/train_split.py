@@ -5,6 +5,7 @@ import argparse
 import dataclasses
 import logging
 import sys
+from datetime import datetime
 from logging import DEBUG
 from pathlib import Path
 
@@ -22,10 +23,12 @@ from core.global_setting import SystemSetting
 from data.MedicalPatchDataset import MedicalPatchDataset
 from model.aneurysm.model.AttentionUnet import AttentionUnet
 from script._training import (
+    build_eval_report_dir,
     build_optimizer,
     build_scheduler,
     load_checkpoint,
     save_checkpoint,
+    save_eval_report,
     train_one_epoch,
     validate,
 )
@@ -137,7 +140,7 @@ def main() -> None:
     )
 
     # Datasets
-    patch_size = tuple(cfg.train.patch_size)
+    patch_size = tuple(cfg.inference.patch_size)
     train_dataset = MedicalPatchDataset(cfg=cfg.data, patch_size=patch_size, seed=cfg.seed)
 
     eval_data_cfg = cfg.data
@@ -145,7 +148,7 @@ def main() -> None:
         eval_data_cfg = dataclasses.replace(cfg.data, train_dirs=list(cfg.data.eval_dirs))
     eval_data_cfg.patch_sampling_mode = "sequential"
     eval_data_cfg.max_load = 10000
-    eval_data_cfg.patches_per_volume = 64
+    eval_data_cfg.patches_per_volume = 100000
     val_dataset = MedicalPatchDataset(cfg=eval_data_cfg, patch_size=patch_size, seed=cfg.seed + 1)
 
     logging.info("Training samples: %d, Validation samples: %d", len(train_dataset), len(val_dataset))
@@ -153,6 +156,8 @@ def main() -> None:
     writer = SummaryWriter(log_dir=str(log_dir / "tensorboard"))
     checkpoint_dir = Path(cfg.checkpoint.save_dir)
     epoch_nifti_dir = log_dir / "epoch_predictions_nifti"
+    eval_report_dir = build_eval_report_dir(log_dir, run_started_at=datetime.now())
+    logging.info("Eval reports will be saved to %s", eval_report_dir)
 
     start_epoch, best_dice = 0, 0.0
     if args.resume:
@@ -186,8 +191,8 @@ def main() -> None:
         if cfg.train.scheduler.lower() != "none" and epoch >= cfg.train.warmup_epochs:
             scheduler.step()
 
-        if (epoch + 1) % cfg.eval_interval == 0:
-            val_dice = validate(
+        if (epoch + 1) % cfg.eval_every_n_epochs == 0:
+            eval_report = validate(
                 model,
                 val_dataset,
                 device,
@@ -195,10 +200,14 @@ def main() -> None:
                 writer,
                 batch_size=cfg.train.batch_size,
                 loss_kwargs=cfg.train.segmentation_loss_kwargs(),
+                cfg=cfg,
             )
+            val_dice = float(eval_report["metrics"]["segmentation"]["mean_dice"])
             is_best = val_dice > best_dice
             if is_best:
                 best_dice = val_dice
+                eval_report["meta"]["is_best_so_far"] = True
+            save_eval_report(report_dir=eval_report_dir, epoch=epoch, report=eval_report)
             save_checkpoint(model, optimizer, epoch + 1, val_dice, checkpoint_dir, is_best)
 
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:

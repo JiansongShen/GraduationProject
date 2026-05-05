@@ -5,16 +5,18 @@ Provides common training loop, checkpoint management, and optimizer/scheduler bu
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from core.config import TrainConfig
+from core.config import Config, TrainConfig
 from data.MedicalPatchDataset import MedicalPatchDataset
 from script.eval_utils import align_target_shape, combined_loss_with_parts, dice_loss
 
@@ -84,7 +86,29 @@ def load_checkpoint(checkpoint_path: str, model: nn.Module, optimizer: Optional[
 
 
 def _default_loss_kwargs() -> dict[str, float | str]:
-    return TrainConfig().segmentation_loss_kwargs()
+    cfg = TrainConfig()
+    return cfg.segmentation_loss_kwargs()
+
+
+def build_eval_report_dir(base_dir: Path, run_started_at: datetime | None = None) -> Path:
+    timestamp = run_started_at or datetime.now()
+    report_dir = base_dir / "eval_reports" / timestamp.strftime("%Y-%m-%d") / f"run_{timestamp.strftime('%H-%M-%S')}"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    return report_dir
+
+
+def save_eval_report(
+    report_dir: Path,
+    epoch: int,
+    report: dict[str, Any],
+) -> Path:
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"eval_epoch_{epoch + 1:04d}.json"
+    payload = json.dumps(report, ensure_ascii=False, indent=2)
+    report_path.write_text(payload, encoding="utf-8")
+    (report_dir / "latest.json").write_text(payload, encoding="utf-8")
+    logging.info("Saved eval report to %s", report_path)
+    return report_path
 
 
 def train_one_epoch(
@@ -140,12 +164,19 @@ def validate(
     writer: SummaryWriter,
     batch_size: int,
     loss_kwargs: Optional[dict[str, float | str]] = None,
-) -> float:
-    """Run validation and return average Dice score (standard soft Dice, independent of surface loss)."""
+    cfg: Config | None = None,
+    report_dir: Path | None = None,
+    is_best_so_far: bool = False,
+) -> dict[str, Any]:
+    """Run validation and return aggregate metrics, optionally persisting a JSON report."""
     model.eval()
     total_dice = 0.0
     total_loss = 0.0
+    total_primary = 0.0
+    total_aux = 0.0
     num_batches = 0
+    num_cases = 0
+    num_patches_total = 0
     lk = loss_kwargs if loss_kwargs is not None else _default_loss_kwargs()
     smooth = float(lk.get("smooth", 1e-6))
 
@@ -155,6 +186,9 @@ def validate(
             if labels is None:
                 continue
 
+            num_cases += 1
+            num_patches_total += int(images.shape[0])
+
             for patch_start in range(0, int(images.shape[0]), batch_size):
                 patch_end = min(patch_start + batch_size, int(images.shape[0]))
                 batch_images = images[patch_start:patch_end].to(device)
@@ -162,16 +196,90 @@ def validate(
 
                 outputs = model(batch_images)
                 batch_labels = align_target_shape(outputs, batch_labels)
-                loss, _, _ = combined_loss_with_parts(outputs, batch_labels, **lk)
+                loss, primary_loss, aux_loss = combined_loss_with_parts(outputs, batch_labels, **lk)
                 dice = 1.0 - dice_loss(outputs, batch_labels, smooth=smooth)
 
                 total_loss += loss.item()
+                total_primary += float(primary_loss.item())
+                total_aux += float(aux_loss.item())
                 total_dice += dice.item()
                 num_batches += 1
 
     avg_dice = total_dice / max(num_batches, 1)
     avg_loss = total_loss / max(num_batches, 1)
+    avg_primary = total_primary / max(num_batches, 1)
+    avg_aux = total_aux / max(num_batches, 1)
     writer.add_scalar("Loss/val", avg_loss, epoch)
     writer.add_scalar("Dice/val", avg_dice, epoch)
     logging.info("Validation - Loss: %.4f, Dice: %.4f", avg_loss, avg_dice)
-    return avg_dice
+
+    report: dict[str, Any] = {
+        "meta": {
+            "task": "segmentation_eval",
+            "model_name": model.__class__.__name__,
+            "report_version": "1.0",
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "epoch": epoch + 1,
+            "is_best_so_far": is_best_so_far,
+        },
+        "metrics": {
+            "loss": {
+                "mean_total": avg_loss,
+                "mean_primary": avg_primary,
+                "mean_aux": avg_aux,
+            },
+            "segmentation": {
+                "mean_dice": avg_dice,
+            },
+            "sampling": {
+                "num_cases": num_cases,
+                "num_batches": num_batches,
+                "num_patches_total": num_patches_total,
+            },
+        },
+    }
+
+    if cfg is not None:
+        report["config_snapshot"] = {
+            "device": cfg.device,
+            "seed": cfg.seed,
+            "eval_every_n_epochs": cfg.eval_every_n_epochs,
+            "train": {
+                "batch_size": cfg.train.batch_size,
+                "epochs": cfg.train.epochs,
+                "learning_rate": cfg.train.learning_rate,
+                "weight_decay": cfg.train.weight_decay,
+                "optimizer": cfg.train.optimizer,
+                "scheduler": cfg.train.scheduler,
+                "warmup_epochs": cfg.train.warmup_epochs,
+                "loss": cfg.train.segmentation_loss_kwargs(),
+            },
+            "inference": {
+                "patch_size": list(cfg.inference.patch_size),
+                "effective_size": list(cfg.inference.effective_size),
+                "batch_size": cfg.inference.batch_size,
+                "use_amp": cfg.inference.use_amp,
+            },
+            "data": {
+                "patch_sampling_mode": dataset.patch_sampling_mode,
+                "patches_per_volume": dataset.patches_per_volume,
+                "target_spacing": list(dataset.target_spacing),
+                "origin_suffix": dataset.cfg.origin_suffix,
+                "label_suffix": dataset.cfg.label_suffix,
+            },
+        }
+
+    report["dataset_summary"] = {
+        "num_eval_cases": num_cases,
+        "patch_sampling_mode": dataset.patch_sampling_mode,
+        "patches_per_volume": dataset.patches_per_volume,
+        "target_spacing": list(dataset.target_spacing),
+        "origin_suffix": dataset.cfg.origin_suffix,
+        "label_suffix": dataset.cfg.label_suffix,
+        "eval_case_names": [Path(case.image_path).name for case in dataset.cases],
+    }
+
+    if report_dir is not None:
+        save_eval_report(report_dir=report_dir, epoch=epoch, report=report)
+
+    return report
