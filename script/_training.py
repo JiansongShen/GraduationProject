@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import torch
+from sklearn.metrics import roc_auc_score
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -111,6 +112,51 @@ def save_eval_report(
     return report_path
 
 
+def _safe_auc(prob: torch.Tensor, target: torch.Tensor) -> float:
+    y_true = target.detach().cpu().view(-1).numpy()
+    y_prob = prob.detach().cpu().view(-1).numpy()
+    if len(y_true) == 0:
+        return 0.5
+    if len(set(y_true.tolist())) < 2:
+        return 0.5
+    return float(roc_auc_score(y_true, y_prob))
+
+
+def _binary_classification_metrics(
+    prob: torch.Tensor,
+    target: torch.Tensor,
+    threshold: float = 0.5,
+) -> dict[str, float]:
+    pred = (prob >= threshold).float()
+    target = target.float()
+
+    tp = float(((pred == 1) & (target == 1)).sum().item())
+    tn = float(((pred == 0) & (target == 0)).sum().item())
+    fp = float(((pred == 1) & (target == 0)).sum().item())
+    fn = float(((pred == 0) & (target == 1)).sum().item())
+
+    total = tp + tn + fp + fn
+    accuracy = (tp + tn) / total if total > 0 else 0.0
+    precision = tp / (tp + fp + 1e-8)
+    recall = tp / (tp + fn + 1e-8)
+    specificity = tn / (tn + fp + 1e-8)
+    f1 = 2.0 * precision * recall / (precision + recall + 1e-8)
+    iou = tp / (tp + fp + fn + 1e-8)
+
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "specificity": specificity,
+        "f1": f1,
+        "iou": iou,
+        "tp": tp,
+        "tn": tn,
+        "fp": fp,
+        "fn": fn,
+    }
+
+
 def train_one_epoch(
     model: nn.Module,
     dataset: MedicalPatchDataset,
@@ -177,6 +223,8 @@ def validate(
     num_batches = 0
     num_cases = 0
     num_patches_total = 0
+    all_probs: list[torch.Tensor] = []
+    all_targets: list[torch.Tensor] = []
     lk = loss_kwargs if loss_kwargs is not None else _default_loss_kwargs()
     smooth = float(lk.get("smooth", 1e-6))
 
@@ -204,14 +252,42 @@ def validate(
                 total_aux += float(aux_loss.item())
                 total_dice += dice.item()
                 num_batches += 1
+                all_probs.append(outputs.detach().float().cpu().view(-1))
+                all_targets.append(batch_labels.detach().float().cpu().view(-1))
 
     avg_dice = total_dice / max(num_batches, 1)
     avg_loss = total_loss / max(num_batches, 1)
     avg_primary = total_primary / max(num_batches, 1)
     avg_aux = total_aux / max(num_batches, 1)
+    probs = torch.cat(all_probs, dim=0) if all_probs else torch.zeros(0)
+    targets = torch.cat(all_targets, dim=0) if all_targets else torch.zeros(0)
+    threshold = 0.5
+    voxel_auc = _safe_auc(probs, targets) if probs.numel() > 0 else 0.5
+    voxel_metrics = _binary_classification_metrics(probs, targets, threshold=threshold) if probs.numel() > 0 else {
+        "accuracy": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.0,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 0.0,
+        "fp": 0.0,
+        "fn": 0.0,
+    }
+    pred_positive_ratio = float((probs >= threshold).float().mean().item()) if probs.numel() > 0 else 0.0
+    gt_positive_ratio = float(targets.float().mean().item()) if targets.numel() > 0 else 0.0
     writer.add_scalar("Loss/val", avg_loss, epoch)
     writer.add_scalar("Dice/val", avg_dice, epoch)
-    logging.info("Validation - Loss: %.4f, Dice: %.4f", avg_loss, avg_dice)
+    writer.add_scalar("AUC/val_voxel", voxel_auc, epoch)
+    writer.add_scalar("F1/val_voxel", voxel_metrics["f1"], epoch)
+    logging.info(
+        "Validation - Loss: %.4f, Dice: %.4f, AUC: %.4f, F1: %.4f",
+        avg_loss,
+        avg_dice,
+        voxel_auc,
+        voxel_metrics["f1"],
+    )
 
     report: dict[str, Any] = {
         "meta": {
@@ -230,6 +306,22 @@ def validate(
             },
             "segmentation": {
                 "mean_dice": avg_dice,
+                "voxel_auc": voxel_auc,
+                "voxel_f1": voxel_metrics["f1"],
+                "voxel_iou": voxel_metrics["iou"],
+                "voxel_accuracy": voxel_metrics["accuracy"],
+                "voxel_precision": voxel_metrics["precision"],
+                "voxel_recall": voxel_metrics["recall"],
+                "voxel_specificity": voxel_metrics["specificity"],
+                "threshold": threshold,
+                "pred_positive_ratio": pred_positive_ratio,
+                "gt_positive_ratio": gt_positive_ratio,
+            },
+            "confusion_matrix": {
+                "tp": voxel_metrics["tp"],
+                "tn": voxel_metrics["tn"],
+                "fp": voxel_metrics["fp"],
+                "fn": voxel_metrics["fn"],
             },
             "sampling": {
                 "num_cases": num_cases,
