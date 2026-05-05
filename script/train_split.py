@@ -147,11 +147,16 @@ def main() -> None:
     if cfg.data.eval_dirs:
         eval_data_cfg = dataclasses.replace(cfg.data, train_dirs=list(cfg.data.eval_dirs))
     eval_data_cfg.patch_sampling_mode = "sequential"
-    eval_data_cfg.max_load = 10000
+    eval_data_cfg.max_load = cfg.data.eval_max_load if cfg.data.eval_max_load is not None else 10000
     eval_data_cfg.patches_per_volume = 100000
     val_dataset = MedicalPatchDataset(cfg=eval_data_cfg, patch_size=patch_size, seed=cfg.seed + 1)
 
-    logging.info("Training samples: %d, Validation samples: %d", len(train_dataset), len(val_dataset))
+    logging.info(
+        "Training samples: %d, Validation samples: %d (eval_max_load=%s)",
+        len(train_dataset),
+        len(val_dataset),
+        cfg.data.eval_max_load,
+    )
 
     writer = SummaryWriter(log_dir=str(log_dir / "tensorboard"))
     checkpoint_dir = Path(cfg.checkpoint.save_dir)
@@ -164,7 +169,12 @@ def main() -> None:
         start_epoch, best_dice = load_checkpoint(args.resume, model, optimizer)
         logging.info("Resuming from epoch %d", start_epoch)
 
-    logging.info("Starting training for %d epochs...", cfg.train.epochs)
+    logging.info(
+        "Starting training for %d epochs... eval_every_n_epochs=%d save_interval=%d",
+        cfg.train.epochs,
+        cfg.eval_every_n_epochs,
+        cfg.checkpoint.save_interval,
+    )
     for epoch in range(start_epoch, cfg.train.epochs):
         _save_epoch_start_first_case_nifti(
             model,
@@ -192,6 +202,11 @@ def main() -> None:
             scheduler.step()
 
         if (epoch + 1) % cfg.eval_every_n_epochs == 0:
+            logging.info(
+                "Running validation/report at epoch %d because eval_every_n_epochs=%d",
+                epoch + 1,
+                cfg.eval_every_n_epochs,
+            )
             eval_report = validate(
                 model,
                 val_dataset,

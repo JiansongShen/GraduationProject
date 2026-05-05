@@ -6,7 +6,7 @@ model:
   depth: 2
 
 train:
-  epochs: 50
+  epochs: 10
   batch_size: 1
   learning_rate: 1.0e-2
   weight_decay: 1.0e-5
@@ -42,6 +42,7 @@ data:
   patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
   background_per_foreground: 2
   max_load: 10
+  eval_max_load: 1
 
 async_load:
   ram_cache_gb: 8.0
@@ -98,7 +99,7 @@ risk:
 device: "cuda"
 seed: 42
 log_dir: "logs"
-eval_interval: 50
+eval_interval: 1
 
 overlap_inference:
   enabled: true

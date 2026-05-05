@@ -51,6 +51,7 @@ class DataConfig:
     patch_sampling_mode: str = "foreground_priority"
     background_per_foreground: int = 2
     max_load: int = 1000
+    eval_max_load: int | None = None
 
     @property
     def label_suffix(self) -> str:
