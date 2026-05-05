@@ -357,7 +357,7 @@ def validate(
                 "patches_per_volume": dataset.patches_per_volume,
                 "target_spacing": list(dataset.target_spacing),
                 "origin_suffix": dataset.cfg.origin_suffix,
-                "label_suffix": dataset.cfg.label_suffix,
+                "label_suffixes": dataset.cfg.label_suffixes,
             },
         }
 
@@ -367,7 +367,7 @@ def validate(
         "patches_per_volume": dataset.patches_per_volume,
         "target_spacing": list(dataset.target_spacing),
         "origin_suffix": dataset.cfg.origin_suffix,
-        "label_suffix": dataset.cfg.label_suffix,
+        "label_suffixes": dataset.cfg.label_suffixes,
         "eval_case_names": [Path(case.image_path).name for case in dataset.cases],
     }
 

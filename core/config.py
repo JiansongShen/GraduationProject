@@ -46,11 +46,15 @@ class DataConfig:
     train_dirs: list[str] = field(default_factory=list)
     eval_dirs: list[str] = field(default_factory=list)
     origin_suffix: str = "_origin.nii.gz"
-    label_suffix: str = "_label.nii.gz"
+    label_suffixes: list[str] = field(default_factory=lambda: ["_label.nii.gz"])
     patches_per_volume: int = 64
     patch_sampling_mode: str = "foreground_priority"
     background_per_foreground: int = 2
     max_load: int = 1000
+
+    @property
+    def label_suffix(self) -> str:
+        return self.label_suffixes[0] if self.label_suffixes else "_label.nii.gz"
 
 
 @dataclass
@@ -168,9 +172,15 @@ def _normalize_train_data(train_data: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_data_data(data_data: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(data_data)
-    label_suffix = normalized.get("label_suffix")
-    if isinstance(label_suffix, list):
-        normalized["label_suffix"] = str(label_suffix[0]) if label_suffix else DataConfig.label_suffix
+    label_suffixes = normalized.get("label_suffixes")
+    label_suffix = normalized.pop("label_suffix", None)
+    if label_suffixes is None:
+        if isinstance(label_suffix, list):
+            label_suffixes = [str(item) for item in label_suffix if str(item)]
+        elif label_suffix:
+            label_suffixes = [str(label_suffix)]
+    if label_suffixes is not None:
+        normalized["label_suffixes"] = [str(item) for item in label_suffixes if str(item)]
     origin_suffix = normalized.get("origin_suffix")
     file_patterns = normalized.get("file_patterns")
     if not origin_suffix and isinstance(file_patterns, list) and file_patterns:

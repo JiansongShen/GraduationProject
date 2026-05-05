@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import random
 from dataclasses import dataclass
@@ -55,22 +56,45 @@ class MedicalPatchDataset(TorchDataset):
         if mode not in valid:
             raise ValueError(f"Unsupported patch_sampling_mode={mode}, expected one of {sorted(valid)}")
 
+    def _find_label_path(self, image_path: str) -> str | None:
+        image_prefix = image_path[: -len(self.cfg.origin_suffix)]
+        for label_suffix in self.cfg.label_suffixes:
+            candidate = image_prefix + label_suffix
+            if os.path.exists(candidate):
+                return candidate
+        return None
+
     def _build_case_records(self, train_dirs: list[str]) -> list[CaseRecord]:
         records: list[CaseRecord] = []
         max_load = int(getattr(self.cfg, "max_load", 1000))
+        skipped_missing_label = 0
 
         for root_dir in train_dirs:
             for path in find_all_file_paths_recursively(root_dir):
                 if not path.endswith(self.cfg.origin_suffix):
                     continue
-                label_path = path[: -len(self.cfg.origin_suffix)] + self.cfg.label_suffix
-                if not os.path.exists(label_path):
-                    raise FileNotFoundError(
-                        f"Label not found for image: {path}\nExpected label: {label_path}"
+                label_path = self._find_label_path(path)
+                if label_path is None:
+                    skipped_missing_label += 1
+                    logging.warning(
+                        "Skipping case without label: image=%s expected_label_suffixes=%s",
+                        path,
+                        self.cfg.label_suffixes,
                     )
+                    continue
                 records.append(CaseRecord(image_path=path, label_path=label_path))
                 if len(records) >= max_load:
+                    if skipped_missing_label:
+                        logging.warning(
+                            "Skipped %d image(s) without labels while building dataset.",
+                            skipped_missing_label,
+                        )
                     return records
+        if skipped_missing_label:
+            logging.warning(
+                "Skipped %d image(s) without labels while building dataset.",
+                skipped_missing_label,
+            )
         return records
 
     def _load_case(self, case: CaseRecord) -> tuple[np.ndarray, np.ndarray, ResampleMeta]:
