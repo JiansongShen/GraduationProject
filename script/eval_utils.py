@@ -32,24 +32,114 @@ def dice_loss(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) ->
     return 1.0 - dice_coeff
 
 
+def dice_coefficient(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
+    """Soft Dice coefficient in ``[0, 1]`` (same smoothing as ``dice_loss``)."""
+    return 1.0 - dice_loss(pred, target, smooth=smooth)
+
+
+def tversky_loss(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    alpha: float = 0.3,
+    beta: float = 0.7,
+    smooth: float = 1e-6,
+) -> torch.Tensor:
+    """Tversky loss = ``1 - TI`` on soft masks; ``beta > alpha`` penalizes false negatives more."""
+    p = pred.float().reshape(-1)
+    t = target.float().reshape(-1)
+    tp = (p * t).sum()
+    fp = (p * (1.0 - t)).sum()
+    fn = ((1.0 - p) * t).sum()
+    tversky_index = (tp + smooth) / (tp + alpha * fp + beta * fn + smooth)
+    return 1.0 - tversky_index
+
+
+def focal_dice_loss(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    gamma: float = 4.0 / 3.0,
+    smooth: float = 1e-6,
+) -> torch.Tensor:
+    """Focal Dice: ``(1 - DSC) ** gamma`` with soft Dice coefficient ``DSC``."""
+    dsc = dice_coefficient(pred, target, smooth=smooth)
+    return (1.0 - dsc).clamp(min=0.0).pow(gamma)
+
+
+def _surface_loss(
+    pred_prob: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    surface: str,
+    tversky_alpha: float,
+    tversky_beta: float,
+    focal_dice_gamma: float,
+    smooth: float,
+) -> torch.Tensor:
+    surface = surface.lower()
+    if surface == "dice":
+        return dice_loss(pred_prob, target, smooth=smooth)
+    if surface == "tversky":
+        return tversky_loss(pred_prob, target, alpha=tversky_alpha, beta=tversky_beta, smooth=smooth)
+    if surface == "focal_dice":
+        return focal_dice_loss(pred_prob, target, gamma=focal_dice_gamma, smooth=smooth)
+    raise ValueError(f"Unknown segmentation_surface_loss: {surface!r} (use dice, tversky, focal_dice)")
+
+
 def combined_loss_with_parts(
-    pred_prob: torch.Tensor, target: torch.Tensor
+    pred_prob: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    surface: str = "tversky",
+    tversky_alpha: float = 0.3,
+    tversky_beta: float = 0.7,
+    focal_dice_gamma: float = 4.0 / 3.0,
+    smooth: float = 1e-6,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Returns ``(combined_loss, bce, dice_loss_value)`` for logging/diagnostics."""
+    """Returns ``(combined_loss, bce, surface_loss)``.
+
+    The third value is the chosen surface term (Dice, Tversky, or Focal Dice), not always
+    classical Dice loss. For validation **metrics**, compute standard Dice with ``dice_loss``
+    or ``dice_coefficient`` explicitly.
+    """
     bce = F.binary_cross_entropy(pred_prob, target)
-    dice = dice_loss(pred_prob, target)
-    total = (bce + dice) / 2
-    return total, bce, dice
+    surface_term = _surface_loss(
+        pred_prob,
+        target,
+        surface=surface,
+        tversky_alpha=tversky_alpha,
+        tversky_beta=tversky_beta,
+        focal_dice_gamma=focal_dice_gamma,
+        smooth=smooth,
+    )
+    total = (bce + surface_term) / 2
+    return total, bce, surface_term
 
 
-def combined_loss(pred_prob: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Mean of voxel-wise BCE and Dice on probability maps.
+def combined_loss(
+    pred_prob: torch.Tensor,
+    target: torch.Tensor,
+    *,
+    surface: str = "tversky",
+    tversky_alpha: float = 0.3,
+    tversky_beta: float = 0.7,
+    focal_dice_gamma: float = 4.0 / 3.0,
+    smooth: float = 1e-6,
+) -> torch.Tensor:
+    """Mean of voxel-wise BCE and the configured surface loss on probability maps.
 
     ``AttentionUnet`` ends with ``Sigmoid`` (``UnetDecoder``), so ``pred_prob``
     is already in ``(0, 1)``. No extra ``sigmoid`` here — that would mean
     treating probabilities as logits or applying sigmoid twice to logits.
     """
-    total, _, _ = combined_loss_with_parts(pred_prob, target)
+    total, _, _ = combined_loss_with_parts(
+        pred_prob,
+        target,
+        surface=surface,
+        tversky_alpha=tversky_alpha,
+        tversky_beta=tversky_beta,
+        focal_dice_gamma=focal_dice_gamma,
+        smooth=smooth,
+    )
     return total
 
 

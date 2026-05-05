@@ -112,8 +112,15 @@ def main() -> None:
     logging.info("Starting training for %d epochs...", cfg.train.epochs)
     for epoch in range(start_epoch, cfg.train.epochs):
         train_loss = train_one_epoch(
-            model, train_dataset, optimizer, device, epoch, writer,
-            batch_size=cfg.train.batch_size, log_interval=10
+            model,
+            train_dataset,
+            optimizer,
+            device,
+            epoch,
+            writer,
+            batch_size=cfg.train.batch_size,
+            log_interval=10,
+            loss_kwargs=cfg.train.segmentation_loss_kwargs(),
         )
         writer.add_scalar("Loss/train_epoch", train_loss, epoch)
         writer.add_scalar("LR/train", optimizer.param_groups[0]["lr"], epoch)
@@ -123,8 +130,13 @@ def main() -> None:
 
         if (epoch + 1) % cfg.eval_interval == 0:
             val_dice = validate(
-                model, val_dataset, device, epoch, writer,
-                batch_size=cfg.train.batch_size
+                model,
+                val_dataset,
+                device,
+                epoch,
+                writer,
+                batch_size=cfg.train.batch_size,
+                loss_kwargs=cfg.train.segmentation_loss_kwargs(),
             )
             is_best = val_dice > best_dice
             if is_best:

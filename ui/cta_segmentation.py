@@ -31,6 +31,7 @@ import torch
 from core.config import Config, DataConfig, OverlapInferenceConfig
 from data.MedicalPatchDataset import MedicalPatchDataset
 from script.eval_split import combine_to_nifti
+from script.eval_utils import restore_prediction_to_source_grid
 from script.overlap_inference import predict_with_overlap, OverlapInferenceConfig as OIConfig
 from script.train_split import build_model
 import numpy as np
@@ -247,11 +248,23 @@ def run_patch_based_segmentation(
         # 构建 SimpleITK 图像
         probability_volume = sitk.GetImageFromArray(pred_np.astype(np.float32))
 
+        # 恢复到原始图像的几何空间
+        probability_volume = restore_prediction_to_source_grid(
+            probability_volume,
+            original_volume,
+            binarize=False,
+        )
+
         # 二值化
-        binary_np = (pred_np > 0.5).astype(np.uint8)
-        binary_mask_volume = sitk.GetImageFromArray(binary_np)
-        stats["foreground_voxels"] = int(binary_np.sum())
-        stats["foreground_ratio"] = float(binary_np.mean())
+        binary_mask_volume = restore_prediction_to_source_grid(
+            probability_volume,
+            original_volume,
+            binarize=True,
+        )
+        # 计算统计信息
+        binary_arr = sitk.GetArrayFromImage(binary_mask_volume)
+        stats["foreground_voxels"] = int(binary_arr.sum())
+        stats["foreground_ratio"] = float(binary_arr.mean())
 
     else:
         logger.info("Using standard non-overlapping patch inference")

@@ -10,6 +10,7 @@ import SimpleITK as sitk
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
+from core.config import TrainConfig
 from data.MedicalPatchDataset import MedicalPatchDataset
 from script.eval_utils import (
     align_target_shape,
@@ -35,6 +36,8 @@ def evaluate(
     model.eval()
     total_loss, total_dice, num_batches = 0.0, 0.0, 0
     batch_size = cfg.train.batch_size if cfg else 1
+    loss_kwargs = cfg.train.segmentation_loss_kwargs() if cfg else TrainConfig().segmentation_loss_kwargs()
+    smooth = float(loss_kwargs.get("smooth", 1e-6))
 
     for sample_idx in range(len(dataset)):
         original_image = sitk.ReadImage(dataset.cases[sample_idx].image_path)
@@ -52,8 +55,8 @@ def evaluate(
 
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
-            loss = combined_loss(outputs, batch_labels)
-            dice = 1.0 - dice_loss(outputs, batch_labels)
+            loss = combined_loss(outputs, batch_labels, **loss_kwargs)
+            dice = 1.0 - dice_loss(outputs, batch_labels, smooth=smooth)
 
             total_loss += loss.item()
             total_dice += dice.item()

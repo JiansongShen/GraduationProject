@@ -14,8 +14,9 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from core.config import TrainConfig
 from data.MedicalPatchDataset import MedicalPatchDataset
-from script.eval_utils import align_target_shape, combined_loss_with_parts
+from script.eval_utils import align_target_shape, combined_loss_with_parts, dice_loss
 
 
 def build_optimizer(model: nn.Module, lr: float, weight_decay: float, optimizer: str = "adamw") -> torch.optim.Optimizer:
@@ -82,6 +83,10 @@ def load_checkpoint(checkpoint_path: str, model: nn.Module, optimizer: Optional[
     return checkpoint["epoch"], checkpoint.get("metric", 0.0)
 
 
+def _default_loss_kwargs() -> dict[str, float | str]:
+    return TrainConfig().segmentation_loss_kwargs()
+
+
 def train_one_epoch(
     model: nn.Module,
     dataset: MedicalPatchDataset,
@@ -91,11 +96,13 @@ def train_one_epoch(
     writer: SummaryWriter,
     batch_size: int,
     log_interval: int = 10,
+    loss_kwargs: Optional[dict[str, float | str]] = None,
 ) -> float:
     """Train for one epoch on case-based dataset."""
     model.train()
     epoch_loss = 0.0
     num_batches = 0
+    lk = loss_kwargs if loss_kwargs is not None else _default_loss_kwargs()
 
     progress = tqdm(range(len(dataset)), desc=f"Epoch {epoch + 1}")
     for batch_idx in progress:
@@ -111,7 +118,7 @@ def train_one_epoch(
             optimizer.zero_grad()
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
-            loss, _, _ = combined_loss_with_parts(outputs, batch_labels)
+            loss, _, _ = combined_loss_with_parts(outputs, batch_labels, **lk)
             loss.backward()
             optimizer.step()
 
@@ -132,12 +139,15 @@ def validate(
     epoch: int,
     writer: SummaryWriter,
     batch_size: int,
+    loss_kwargs: Optional[dict[str, float | str]] = None,
 ) -> float:
-    """Run validation and return average Dice score."""
+    """Run validation and return average Dice score (standard soft Dice, independent of surface loss)."""
     model.eval()
     total_dice = 0.0
     total_loss = 0.0
     num_batches = 0
+    lk = loss_kwargs if loss_kwargs is not None else _default_loss_kwargs()
+    smooth = float(lk.get("smooth", 1e-6))
 
     with torch.no_grad():
         for sample_idx in range(len(dataset)):
@@ -152,8 +162,8 @@ def validate(
 
                 outputs = model(batch_images)
                 batch_labels = align_target_shape(outputs, batch_labels)
-                loss = (combined_loss_with_parts(outputs, batch_labels)[0])
-                dice = 1.0 - combined_loss_with_parts(outputs, batch_labels)[2]
+                loss, _, _ = combined_loss_with_parts(outputs, batch_labels, **lk)
+                dice = 1.0 - dice_loss(outputs, batch_labels, smooth=smooth)
 
                 total_loss += loss.item()
                 total_dice += dice.item()

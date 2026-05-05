@@ -1,83 +1,70 @@
 \contentsline {section}{摘要}{I}{figure.caption.2}%
-\contentsline {section}{ABSTRACT}{III}{figure.caption.2}%
+\contentsline {section}{ABSTRACT}{II}{figure.caption.2}%
 \contentsline {section}{\numberline {1}绪论}{1}{section.1}%
 \contentsline {subsection}{\numberline {1.1}研究背景与意义}{1}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}国内外研究现状}{2}{subsection.1.2}%
-\contentsline {subsubsection}{\numberline {1.2.1}动脉瘤与脑血管影像分析的传统途径}{2}{subsubsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2}国内外研究现状}{1}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {1.2.1}动脉瘤与脑血管影像分析的传统途径}{1}{subsubsection.1.2.1}%
 \contentsline {subsubsection}{\numberline {1.2.2}基于深度学习的分割与多模态预测}{2}{subsubsection.1.2.2}%
 \contentsline {subsection}{\numberline {1.3}本文面临的问题与主要思路}{2}{subsection.1.3}%
 \contentsline {subsection}{\numberline {1.4}课题来源与研究内容}{3}{subsection.1.4}%
 \contentsline {subsection}{\numberline {1.5}论文结构安排}{3}{subsection.1.5}%
-\contentsline {subsection}{\numberline {1.6}本章小结}{4}{subsection.1.6}%
-\contentsline {section}{\numberline {2}系统实现与方法设计}{5}{section.2}%
-\contentsline {subsection}{\numberline {2.1}系统总体架构}{5}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}相关理论简述}{5}{subsection.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.1}全卷积分割与 Dice 损失}{5}{subsubsection.2.2.1}%
-\contentsline {subsubsection}{\numberline {2.2.2}注意力门控跳跃连接}{6}{subsubsection.2.2.2}%
-\contentsline {subsection}{\numberline {2.3}动脉瘤分割模块设计}{6}{subsection.2.3}%
-\contentsline {subsubsection}{\numberline {2.3.1}数据组织与流式补丁采样}{6}{subsubsection.2.3.1}%
-\contentsline {subsubsection}{\numberline {2.3.2}网络结构与输出层}{7}{subsubsection.2.3.2}%
-\contentsline {subsubsection}{\numberline {2.3.3}损失函数与优化策略}{7}{subsubsection.2.3.3}%
-\contentsline {subsubsection}{\numberline {2.3.4}检查点与整例推理重建}{7}{subsubsection.2.3.4}%
-\contentsline {subsection}{\numberline {2.4}破裂风险预测模块设计}{8}{subsection.2.4}%
-\contentsline {subsubsection}{\numberline {2.4.1}表格数据构建与预处理}{8}{subsubsection.2.4.1}%
-\contentsline {subsubsection}{\numberline {2.4.2}RiskCrossAttentionModel 结构}{8}{subsubsection.2.4.2}%
-\contentsline {subsubsection}{\numberline {2.4.3}损失函数、类别加权与阈值搜索}{8}{subsubsection.2.4.3}%
-\contentsline {subsection}{\numberline {2.5}Web 服务与端到端演示}{9}{subsection.2.5}%
-\contentsline {subsection}{\numberline {2.6}本章小结}{9}{subsection.2.6}%
-\contentsline {section}{\numberline {3}实验设计与结果分析}{10}{section.3}%
-\contentsline {subsection}{\numberline {3.1}实验说明与可复现性}{10}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}实验环境与主要依赖}{10}{subsection.3.2}%
-\contentsline {subsubsection}{\numberline {3.2.1}硬件与软件}{10}{subsubsection.3.2.1}%
-\contentsline {subsubsection}{\numberline {3.2.2}随机种子与版本记录}{11}{subsubsection.3.2.2}%
-\contentsline {subsection}{\numberline {3.3}数据协议与预处理约定}{11}{subsection.3.3}%
-\contentsline {subsubsection}{\numberline {3.3.1}分割任务数据}{11}{subsubsection.3.3.1}%
-\contentsline {subsubsection}{\numberline {3.3.2}破裂风险任务数据}{11}{subsubsection.3.3.2}%
-\contentsline {subsection}{\numberline {3.4}主线 A：动脉瘤分割实验设计}{12}{subsection.3.4}%
-\contentsline {subsubsection}{\numberline {3.4.1}训练协议与超参数（与配置项对齐）}{12}{subsubsection.3.4.1}%
-\contentsline {subsubsection}{\numberline {3.4.2}训练过程监控与产出文件}{12}{subsubsection.3.4.2}%
-\contentsline {subsubsection}{\numberline {3.4.3}整例推理与空间一致性}{12}{subsubsection.3.4.3}%
-\contentsline {subsubsection}{\numberline {3.4.4}分割结果的多维度解读（建议在答辩中展开）}{12}{subsubsection.3.4.4}%
-\contentsline {subsubsection}{\numberline {3.4.5}横向对比与消融实验框架}{14}{subsubsection.3.4.5}%
-\contentsline {subsection}{\numberline {3.5}主线 B：破裂风险预测实验设计}{14}{subsection.3.5}%
-\contentsline {subsubsection}{\numberline {3.5.1}数据划分与泄漏防护}{14}{subsubsection.3.5.1}%
-\contentsline {subsubsection}{\numberline {3.5.2}模型超参数与训练细节}{15}{subsubsection.3.5.2}%
-\contentsline {subsubsection}{\numberline {3.5.3}优化目标与决策阈值}{15}{subsubsection.3.5.3}%
-\contentsline {subsubsection}{\numberline {3.5.4}产出物与结果登记表}{16}{subsubsection.3.5.4}%
-\contentsline {subsubsection}{\numberline {3.5.5}风险模型的结果解读要点}{16}{subsubsection.3.5.5}%
-\contentsline {subsection}{\numberline {3.6}系统集成与演示实验}{17}{subsection.3.6}%
-\contentsline {subsubsection}{\numberline {3.6.1}Web 接口层面的任务闭环}{17}{subsubsection.3.6.1}%
-\contentsline {subsubsection}{\numberline {3.6.2}任务书交付物对照表}{17}{subsubsection.3.6.2}%
-\contentsline {subsection}{\numberline {3.7}消融实验与灵敏度分析}{17}{subsection.3.7}%
-\contentsline {subsection}{\numberline {3.8}可视化与定性案例分析}{18}{subsection.3.8}%
-\contentsline {subsection}{\numberline {3.9}本章小结}{18}{subsection.3.9}%
-\contentsline {section}{\numberline {4}结论与展望}{20}{section.4}%
-\contentsline {subsection}{\numberline {4.1}工作总结}{20}{subsection.4.1}%
-\contentsline {subsubsection}{\numberline {4.1.1}分割子任务：从数据协议到可交付模型}{20}{subsubsection.4.1.1}%
-\contentsline {subsubsection}{\numberline {4.1.2}风险子任务：从表格清洗到阈值固定的决策规则}{20}{subsubsection.4.1.2}%
-\contentsline {subsubsection}{\numberline {4.1.3}工程集成与演示}{21}{subsubsection.4.1.3}%
-\contentsline {subsubsection}{\numberline {4.1.4}与参考范式的对照}{21}{subsubsection.4.1.4}%
-\contentsline {subsection}{\numberline {4.2}主要特点与创新点归纳（本科论文尺度）}{21}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}不足与展望}{21}{subsection.4.3}%
-\contentsline {subsubsection}{\numberline {4.3.1}数据与评测层面}{21}{subsubsection.4.3.1}%
-\contentsline {subsubsection}{\numberline {4.3.2}算法与建模层面}{22}{subsubsection.4.3.2}%
-\contentsline {subsubsection}{\numberline {4.3.3}系统与合规层面}{22}{subsubsection.4.3.3}%
-\contentsline {subsubsection}{\numberline {4.3.4}个人收获与后续学习计划}{22}{subsubsection.4.3.4}%
-\contentsline {subsection}{\numberline {4.4}结束语}{22}{subsection.4.4}%
-\contentsline {section}{参考文献}{23}{subsection.4.4}%
-\contentsline {section}{\numberline {5}参考文献}{23}{section.5}%
-\contentsline {section}{附录A：关键配置与复现实验步骤}{25}{section.5}%
-\contentsline {section}{\numberline {6}关键配置与复现实验步骤}{25}{section.6}%
-\contentsline {subsection}{\numberline {6.1}项目结构说明}{25}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}环境配置}{25}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}训练流程说明}{26}{subsection.6.3}%
-\contentsline {subsubsection}{\numberline {6.3.1}动脉瘤分割模型训练}{26}{subsubsection.6.3.1}%
-\contentsline {subsubsection}{\numberline {6.3.2}破裂风险预测模型训练}{26}{subsubsection.6.3.2}%
-\contentsline {subsection}{\numberline {6.4}关键配置参数说明（与仓库默认值对齐）}{26}{subsection.6.4}%
-\contentsline {subsubsection}{\numberline {6.4.1}分割相关}{26}{subsubsection.6.4.1}%
-\contentsline {subsubsection}{\numberline {6.4.2}风险相关}{27}{subsubsection.6.4.2}%
-\contentsline {subsection}{\numberline {6.5}推理与演示}{27}{subsection.6.5}%
-\contentsline {section}{致谢}{28}{subsection.6.5}%
-\contentsline {section}{\numberline {7}致\hskip 1em\relax 谢}{28}{section.7}%
-\contentsline {section}{原创性声明和使用授权书}{29}{section.7}%
-\contentsfinish 
+\contentsline {subsection}{\numberline {1.6}本章小结}{3}{subsection.1.6}%
+\contentsline {section}{\numberline {2}系统实现与方法设计}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}系统总体架构}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}相关理论简述}{4}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}全卷积分割与 Dice 损失}{4}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}注意力门控跳跃连接}{4}{subsubsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.3}动脉瘤分割模块设计}{5}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}数据组织与流式补丁采样}{5}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}网络结构与输出层}{5}{subsubsection.2.3.2}%
+\contentsline {subsubsection}{\numberline {2.3.3}损失函数与优化策略}{6}{subsubsection.2.3.3}%
+\contentsline {subsubsection}{\numberline {2.3.4}检查点与整例推理重建}{6}{subsubsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.4}破裂风险预测模块设计}{6}{subsection.2.4}%
+\contentsline {subsubsection}{\numberline {2.4.1}表格数据构建与预处理}{6}{subsubsection.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.4.2}RiskCrossAttentionModel 结构}{6}{subsubsection.2.4.2}%
+\contentsline {subsubsection}{\numberline {2.4.3}损失函数、类别加权与阈值搜索}{7}{subsubsection.2.4.3}%
+\contentsline {subsection}{\numberline {2.5}Web 服务与端到端演示}{7}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}本章小结}{7}{subsection.2.6}%
+\contentsline {section}{\numberline {3}实验设计与结果分析}{8}{section.3}%
+\contentsline {subsection}{\numberline {3.1}实验说明与可复现性}{8}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}实验环境与主要依赖}{8}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}硬件与软件}{8}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3.2.2}随机种子与版本记录}{9}{subsubsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.3}数据协议与预处理约定}{9}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}分割任务数据}{9}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}破裂风险任务数据}{9}{subsubsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.4}主线 A：动脉瘤分割实验设计}{9}{subsection.3.4}%
+\contentsline {subsubsection}{\numberline {3.4.1}训练协议与超参数（与配置项对齐）}{9}{subsubsection.3.4.1}%
+\contentsline {subsubsection}{\numberline {3.4.2}训练过程监控与产出文件}{10}{subsubsection.3.4.2}%
+\contentsline {subsubsection}{\numberline {3.4.3}整例推理与空间一致性}{10}{subsubsection.3.4.3}%
+\contentsline {subsubsection}{\numberline {3.4.4}分割结果的多维度解读（建议在答辩中展开）}{10}{subsubsection.3.4.4}%
+\contentsline {subsubsection}{\numberline {3.4.5}横向对比与消融实验框架}{10}{subsubsection.3.4.5}%
+\contentsline {subsection}{\numberline {3.5}主线 B：破裂风险预测实验设计}{12}{subsection.3.5}%
+\contentsline {subsubsection}{\numberline {3.5.1}数据划分与泄漏防护}{12}{subsubsection.3.5.1}%
+\contentsline {subsubsection}{\numberline {3.5.2}模型超参数与训练细节}{12}{subsubsection.3.5.2}%
+\contentsline {subsubsection}{\numberline {3.5.3}优化目标与决策阈值}{12}{subsubsection.3.5.3}%
+\contentsline {subsubsection}{\numberline {3.5.4}产出物与结果登记表}{14}{subsubsection.3.5.4}%
+\contentsline {subsubsection}{\numberline {3.5.5}风险模型的结果解读要点}{14}{subsubsection.3.5.5}%
+\contentsline {subsection}{\numberline {3.6}系统集成与演示实验}{14}{subsection.3.6}%
+\contentsline {subsubsection}{\numberline {3.6.1}Web 接口层面的任务闭环}{14}{subsubsection.3.6.1}%
+\contentsline {subsubsection}{\numberline {3.6.2}任务书交付物对照表}{15}{subsubsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.7}消融实验与灵敏度分析}{15}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}可视化与定性案例分析}{16}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}本章小结}{16}{subsection.3.9}%
+\contentsline {section}{\numberline {4}结论与展望}{17}{section.4}%
+\contentsline {subsection}{\numberline {4.1}工作总结}{17}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}分割子任务：从数据协议到可交付模型}{17}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}风险子任务：从表格清洗到阈值固定的决策规则}{17}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}工程集成与演示}{17}{subsubsection.4.1.3}%
+\contentsline {subsubsection}{\numberline {4.1.4}与参考范式的对照}{18}{subsubsection.4.1.4}%
+\contentsline {subsection}{\numberline {4.2}主要特点与创新点归纳（本科论文尺度）}{18}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}不足与展望}{18}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}数据与评测层面}{18}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}算法与建模层面}{18}{subsubsection.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.3.3}系统与合规层面}{19}{subsubsection.4.3.3}%
+\contentsline {subsubsection}{\numberline {4.3.4}个人收获与后续学习计划}{19}{subsubsection.4.3.4}%
+\contentsline {subsection}{\numberline {4.4}结束语}{19}{subsection.4.4}%
+\contentsline {section}{参考文献}{20}{subsection.4.4}%
+\contentsline {section}{附录A：关键配置与复现实验步骤}{21}{subsection.4.4}%
+\contentsline {section}{致谢}{24}{Item.18}%
+\contentsline {section}{原创性声明和使用授权书}{25}{Item.18}%

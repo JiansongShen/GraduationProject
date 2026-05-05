@@ -104,5 +104,6 @@ overlap_inference:
   padding_value: 0.0               # Fill value for constant padding
   blend_mode: "gaussian"          # Blending: "gaussian" (recommended) or "average"
   gaussian_sigma: 0.4             # Gaussian sigma (relative to effective_size)
+  binarize_threshold: 0.5          # Threshold for probability-to-mask conversion
   use_amp: true                   # Enable automatic mixed precision (FP16)
   batch_size: 4                   # Inference batch size

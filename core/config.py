@@ -34,6 +34,7 @@ class OverlapInferenceConfig:
     padding_value: float = 0.0
     blend_mode: str = "gaussian"
     gaussian_sigma: float = 0.4
+    binarize_threshold: float = 0.5  # Threshold for converting probability to binary mask
     use_amp: bool = True
     batch_size: int = 4
 
@@ -62,6 +63,9 @@ class OverlapInferenceConfig:
 
             if self.gaussian_sigma <= 0:
                 raise ValueError(f"gaussian_sigma must be positive, got {self.gaussian_sigma}")
+
+            if self.binarize_threshold < 0 or self.binarize_threshold > 1:
+                raise ValueError(f"binarize_threshold must be in [0, 1], got {self.binarize_threshold}")
 
             if self.batch_size <= 0:
                 raise ValueError(f"batch_size must be positive, got {self.batch_size}")
@@ -109,6 +113,22 @@ class TrainConfig:
     optimizer: str = "adam"
     scheduler: str = "cosine"
     warmup_epochs: int = 5
+    # Segmentation: BCE + surface term. surface ∈ {"dice","tversky","focal_dice"}
+    segmentation_surface_loss: str = "tversky"
+    tversky_alpha: float = 0.3
+    tversky_beta: float = 0.7
+    focal_dice_gamma: float = 4.0 / 3.0
+    loss_smooth: float = 1e-6
+
+    def segmentation_loss_kwargs(self) -> dict[str, float | str]:
+        """Keyword arguments for ``script.eval_utils.combined_loss*``."""
+        return {
+            "surface": self.segmentation_surface_loss,
+            "tversky_alpha": self.tversky_alpha,
+            "tversky_beta": self.tversky_beta,
+            "focal_dice_gamma": self.focal_dice_gamma,
+            "smooth": self.loss_smooth,
+        }
 
 
 @dataclass

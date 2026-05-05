@@ -1,345 +1,65 @@
-\documentclass[UTF8,a4paper,12pt]{ctexart}
-\usepackage[left=3cm, right=3cm]{geometry}
+\documentclass[UTF8,a4paper,12pt,fontset=none,linespread=1,oneside]{ctexart}
+\usepackage{cquthesis}
+\graphicspath{{./}}
 
-\usepackage{amsmath}
-\numberwithin{equation}{section}
-\renewcommand\thesection{\arabic{section}}
-\allowdisplaybreaks[4]       %多行公式中换页
-\usepackage{array}
-\usepackage[font=small,labelsep=none]{caption}
-\usepackage{amssymb}
-\usepackage{tikz}
-\usepackage{amsthm}
-\usepackage{mathrsfs}
-
-\usepackage{dutchcal}
-\usepackage{color}
-\usepackage{graphicx}    %插入图片 
-\usepackage{times}
-\usepackage{mathptmx}
-\usepackage{fancyhdr} %页眉页脚
-\usepackage{booktabs}  %三线表
-
-
-
-\pagestyle{fancy}
-\fancyhf{}
-\fancyfoot[C]{\thepage}
-
-\newcommand*{\circled}[1]{\lower.7ex\hbox{\tikz\draw (0pt, 0pt)%
-    circle (.5em) node {\makebox[1em][c]{\small #1}};}}
-    
-\usepackage{hyperref}  %目录
-\hypersetup{colorlinks=true,linkcolor=black}
-
-\renewcommand {\thefigure} {\thesection{}.\arabic{figure}}%设定图片的编号。这样设置的实现效果为图1.1
-\renewcommand {\thetable} {\thesection{}.\arabic{table}}
-
-
-\usepackage{caption}
-\captionsetup{font={small},labelsep=quad}%文字5号，之间空一个汉字符位。
-
-\usepackage{appendix}
-\usepackage{tocloft} 
-\usepackage{titletoc}
-
-\usepackage{setspace}
-\usepackage{titlesec}
-\setstretch{1.25}
-
-
-% 设置section字体为黑体三号
-\titleformat{\section}{\heiti\zihao{3}\centering}{\thesection}{0.5em}{}[]
-% 设置subsection字体为黑体小三号
-\titleformat{\subsection}{\heiti\zihao{-3}}{\thesubsection}{0.5em}{}[]
-% 设置subsubsection字体为黑体四号
-\titleformat{\subsubsection}{\heiti\zihao{4}}{\thesubsubsection}{0.5em}{}[]
-%\titlespacing{\section}{0pt}{\baselineskip}{\baselineskip}
-%\titlespacing{\section}{0pt}{0pt}{\baselineskip}
-
-% 目录中section的格式
-\titlecontents{section}[0pt]{\addvspace{0pt}\filright\heiti\zihao{4}}%
-               {\contentspush{\thecontentslabel \quad}}%
-               {}{\titlerule*[8pt]{.}\contentspage}
-% 目录中subsection的格式
-\titlecontents{subsection}[1em]{\addvspace{0pt}\filright\heiti\zihao{5}}%
-               {\contentspush{\thecontentslabel \quad}}%
-               {}{\titlerule*[8pt]{.}\contentspage}
-% 目录中subsubsection的格式
-\titlecontents{subsubsection}[2em]{\addvspace{0pt}\filright\songti\zihao{5}}%
-               {\contentspush{\thecontentslabel \quad}}%
-               {}{\titlerule*[8pt]{.}\contentspage}
-
-\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}} %为目录中section补上引导点
-               
-\makeatletter % 单线页眉
-\def\headrule{{\if@fancyplain\let\headrulewidth\plainheadrulewidth\fi%
-\hrule\@height 0.5pt \@width\headwidth\vskip1.5pt% 上面线为0.5pt粗
-\vskip-2\headrulewidth\vskip-1pt}}     % 与下面正文之间的垂直间距
-\makeatother
-
-
-
-\setlength{\headheight}{14.48167pt} 
-\setlength{\voffset}{-1.14cm}
-\setlength{\topmargin}{0cm}
-\setlength{\headsep}{2.5cm}
-
+\CQUsetup{
+  chinese-title = {基于深度学习的颅内动脉瘤检测与破裂风险预测系统},
+  english-title = {Deep Learning-Based Intracranial Aneurysm Detection and Rupture Risk Prediction System},
+  student = {申建松},
+  student-id = {20221556},
+  advisor = {文静},
+  assistant-advisor = {},
+  major = {计算机科学与技术},
+  college = {重庆大学计算机学院},
+  date = {2026年6月},
+  english-student = {SHEN Jiansong},
+  english-advisor = {Assoc.~Prof. WEN Jing},
+  english-assistant-advisor = {},
+  english-major = {Computer Science and Technology},
+  english-college = {College of Computer Science, Chongqing University},
+  english-date = {June, 2026},
+  logo = {fig1.PNG}
+}
 
 \begin{document}
 
-\thispagestyle{empty}
+\CQUmakecover
+\CQUfrontmatter
 
-
-
-
-\begin{center}
-\heiti  \zihao{-2} 重庆大学本科学生毕业论文（设计）
-\end{center}
-%该页为中文扉页。无需页眉页脚，纸质论文应装订在右侧
-~\\
-\begin{center}
-\heiti  \zihao{2} 基于深度学习的颅内动脉瘤检测与破裂风险预测系统
-\end{center}
-%中文论文标题，1行或2行，黑体，二号，居中。论文题目不得超过36个汉字
-
-~\\
-\renewcommand{\headrulewidth}{1pt}
-\begin{figure}[htb] 
-  \centering
-    \center{\includegraphics[width=5cm]  {fig1.png}} 
-     \end{figure}
-     
-~\\
-\begin{center}
-\heiti\zihao{4}
-\begin{tabular}{l}
-学\qquad 生：王建华\\
-学\qquad 号：20XXXXXX\\
-指导教师：杨XX\\
-助理指导教师：李XX\\
-专\qquad 业：\\
-\end{tabular}
-\end{center}
-
-%此模版适用于理工农医等专业；人文社科类专业按《重庆大学普通本科毕业论文（设计）撰写规范化要求》。  若没有助理指导教师，请删除"助理指导教师姓名"栏。若为校外完成毕业论文（设计），请改为"校外指导教师姓名"即可。  学院、专业填全称。
-
-~\\
-\begin{center}
-\heiti \zihao{-2} {重庆大学XXXXXX学院}\\
-\end{center}
-
-\begin{center}
-\heiti \zihao{3} {20XX年6月}
-\end{center}
-
-
-
-\newpage
-\thispagestyle{empty}
-\setmainfont{Times New Roman}
-\begin{center}
-\zihao{3}
-\textbf{
-Undergraduate Thesis (Design) of Chongqing University}
-\end{center}
-~\\
-\begin{center}
-\zihao{2}
-\textbf{
-Deep Learning-Based Intracranial Aneurysm Detection and Rupture Risk Prediction System }
-\end{center}
-
-~\\
-\renewcommand{\headrulewidth}{1pt}
-\begin{figure}[htb] 
-  \centering
-    \center{\includegraphics[width=5cm]  {fig1.png}} 
-     \end{figure}
-     
-
-\setmainfont{Times New Roman}
-\begin{center}
-\zihao{3} 
-\textbf{By}  \\
-\textbf{WANG Jianhua }
-\end{center}
-
-\begin{center}
-\zihao{3} 
-\textbf{Supervised by}\\
-\textbf{Prof. YANG XX}\\
-\textbf{and}\\
-\textbf{Prof. LI XX}
-\end{center}
-
-\begin{center}
-\zihao{-2} 
-\textbf{XXXXXX}\\ %专业
-\textbf{XXXXXX}\\ %学院
-\textbf{Chongqing University}
-\end{center}
-
-\begin{center}
-\zihao{3} 
-\textbf{June，20XX}
-\end{center}
-
-
-\newpage
-\pagestyle{fancy}
-\pagenumbering{Roman}
-
-% 设置左侧页眉
-\fancyhead[LH]{ \songti\zihao{-5} 重庆大学本科学生毕业论文（设计）}
-\fancyhead[RH]{\songti\zihao{-5} 摘要}
-
-
-
-\addcontentsline{toc}{section}{摘要}
-
-\section*{摘\quad 要}
+\begin{CQUChineseAbstract}{颅内动脉瘤；CTA；三维分割；Attention U-Net；表格学习；交叉注意力；破裂风险预测}
 \input{contents/abstract_cn}
+\end{CQUChineseAbstract}
 
-\newpage
-\fancyhead[LH]{ \songti\zihao{-5} 重庆大学本科学生毕业论文（设计）}
-\fancyhead[RH]{\zihao{-5} ABSTRACT}
-
-\addcontentsline{toc}{section}{ABSTRACT}
-\titleformat{\section}[block]{\centering\bfseries\fontspec{Times New Roman}\fontsize{16pt}{20pt}\selectfont}{\thesection}{1em}{}[]
-
-\section*{ABSTRACT}
+\begin{CQUEnglishAbstract}{intracranial aneurysm; CTA; 3D segmentation; Attention U-Net; tabular learning; cross-attention; rupture risk prediction}
 \input{contents/abstract_en}
+\end{CQUEnglishAbstract}
 
-\newpage
-\fancyhead[LH]{ \songti\zihao{-5} 重庆大学本科学生毕业论文（设计）}
-\fancyhead[RH]{\songti\zihao{-5} 目录}
+\CQUtableofcontents
+\CQUmainmatter
 
-\newpage
-\fancyhead[LH]{ \songti\zihao{-5} 重庆大学本科学生毕业论文（设计）}
-\fancyhead[RH]{\songti\zihao{-5} 目录}
-
-\renewcommand\contentsname{{目\quad 录}}
-
-\begin{center}
-{\tableofcontents
-\thispagestyle{fancy}
-\fancyhead [RO, L] {\zihao{-5}{\songti 1\quad 绪论}}
-\fancyhead [LO, R] {\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-}
-\end{center}
-
-
-
-\newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 1\quad 绪论}}
-\pagenumbering{arabic}
-
-
-\titleformat{\section}{\heiti\zihao{3}\centering}{\thesection}{0.5em}{}[]
 \input{contents/chapter1_intro}
-
-\newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 2\quad 系统实现与方法设计}}
 \input{contents/chapter2_method}
-
-\newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 3\quad 实验设计与结果分析}}
 \input{contents/chapter3_analysis}
-
-\newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 4\quad 结论与展望}}
 \input{contents/chapter4_conclusion}
 
-\newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 参考文献}}
-
-\addcontentsline{toc}{section}{参考文献}
-\renewcommand\refname{参考文献}
-
-\input{contents/references}
+\CQUprintbibliography
 
 \newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 附录A：关键配置与复现实验步骤}}
-
+\CQUsetheader{附录A：关键配置与复现实验步骤}
 \addcontentsline{toc}{section}{附录A：关键配置与复现实验步骤}
+\CQUblankline
+\section*{附录A：关键配置与复现实验步骤}
+\CQUblankline
 \input{contents/appendix}
 
 \newpage
-\fancyhead[LH]{\zihao{-5}{\songti 重庆大学本科学生毕业论文（设计）}}
-\fancyhead[RH]{\zihao{-5}{\songti 致谢}}
-
+\CQUsetheader{致谢}
 \addcontentsline{toc}{section}{致谢}
+\CQUblankline
 \section*{致\quad 谢}
+\CQUblankline
 \input{contents/ack}
 
-\newpage
-\thispagestyle{empty}
-
-\addcontentsline{toc}{section}{原创性声明和使用授权书}
-\begin{center}
-\heiti \zihao{3}
-原创性声明
-\end{center}
-
-\songti\zihao{-4}
-郑重声明：所呈交的论文（设计）\underline{《  \hspace{6em}》}，是本人在导师的指导下，独立进行研究取得的成果。除论文（设计）中已经标注引用的内容外，本论文（设计）不包含其他人或集体已经发表或撰写过的作品成果。对本文的研究做出贡献的个人和集体，均已在文中以明确方式标明。本人完全意识到本声明的法律后果，并承诺因本声明而产生的法律结果由本人承担。
-
-~\\
-\begin{flushleft}
-\begin{tabular}{l}
-\songti\zihao{-4}
-论文（设计）作者签名: \underline{\hspace{6em}}\\
-\songti\zihao{-4}
-日期：\underline{\hspace{6em}}
-\end{tabular}
-\end{flushleft}
-
-~\\
-\begin{center}
-\heiti \zihao{3}
-使用授权书
-\end{center}
-
-~\\
-\begin{flushleft}
-\begin{tabular}{l}
-\songti\zihao{-4}
-论文（设计）作者签名: \underline{\hspace{6em}}\\
-\songti\zihao{-4}
-日期：\underline{\hspace{6em}}
-\end{tabular}
-\end{flushleft}
-
-~\\
-\begin{center}
-\heiti \zihao{3}
-使用授权书
-\end{center}
-
-\songti\zihao{-4}
-本论文（设计）作者完全了解学校有关保留、使用论文（设计）的规定，同意学校保留并向国家有关部门或机构送交论文（设计）复印件和电子版，允许论文（设计）被查阅和借阅。本人授权重庆大学将本论文（设计）的全部或部分内容编入有关数据库进行检索，可以采用影印、缩印或扫描等复制方式保存和汇编本论文（设计）。
-
-~\\
-\songti\zihao{-4}
-本论文（设计）属于：\par
-保\quad 密 $\Box$  \quad 在\underline{\qquad}年解密后适用本授权书\par
-不保密 $\Box$
-
-~\\
-~\\
-\begin{flushleft}
-\songti\zihao{-4}
-\begin{tabular}{l l}
-论文（设计）作者签名：\underline{\hspace{6em}} \hspace{300mm}&指导教师签名：\underline{\hspace{6em}} \\
-日期：\underline{\hspace{6em}} &日期：\underline{\hspace{6em}}\\
-\end{tabular}
-\end{flushleft}
+\CQUmakedeclaration
 
 \end{document}
