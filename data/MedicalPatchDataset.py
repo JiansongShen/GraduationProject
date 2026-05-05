@@ -158,8 +158,11 @@ class MedicalPatchDataset(TorchDataset):
                 torch.from_numpy(crop_patch(image, start, self.patch_size)[None, ...].astype(np.float32))
             )
             if label is not None:
+                label_cropped = crop_patch(label, start, self.patch_size).astype(np.int64)
+                # output infos shape, mean, min, max
+                logging.info("Output info:", label_cropped.shape, label_cropped.mean(), label_cropped.min(), label_cropped.max())
                 label_patches.append(
-                    torch.from_numpy(crop_patch(label, start, self.patch_size).astype(np.int64))
+                    torch.from_numpy(label_cropped)
                 )
 
         if not image_patches:

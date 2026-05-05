@@ -138,6 +138,7 @@ class ForegroundSampler(PatchSampler):
         num_patches: int,
     ) -> list[tuple[int, int, int]]:
         if label is None:
+            logging.warning("No label provided, falling back to sequential")
             return self.iter_grid_starts(image.shape)[:num_patches]
 
         fg_coords = np.argwhere(label > 0)
