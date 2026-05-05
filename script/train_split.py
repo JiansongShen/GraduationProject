@@ -8,7 +8,9 @@ import sys
 from logging import DEBUG
 from pathlib import Path
 
+import SimpleITK as sitk
 import torch
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 project_root = Path(__file__).resolve().parent.parent
@@ -28,6 +30,7 @@ from script._training import (
     validate,
 )
 from script.common import setup_basic_logging
+from script.eval_split import _save_predictions
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +39,52 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training")
     parser.add_argument("--device", type=str, default=None, help="Override device (cuda/cpu)")
     return parser.parse_args()
+
+
+@torch.no_grad()
+def _save_epoch_start_first_case_nifti(
+    model: nn.Module,
+    val_dataset: MedicalPatchDataset,
+    device: torch.device,
+    epoch: int,
+    out_dir: Path,
+    batch_size: int,
+) -> None:
+    """每个 epoch 训练前：对验证集第 0 例做顺序 patch 推理并写入 NIfTI（概率 + 二值）。"""
+    if len(val_dataset) == 0:
+        logging.warning("epoch NIfTI snapshot skipped: empty validation dataset")
+        return
+    sample_idx = 0
+    images, labels = val_dataset.get_patches(sample_idx, sampling_mode="sequential")
+    if labels is None:
+        logging.warning("epoch NIfTI snapshot skipped: case 0 has no label patches")
+        return
+    if int(images.shape[0]) == 0:
+        logging.warning("epoch NIfTI snapshot skipped: case 0 has zero sequential patches")
+        return
+
+    was_training = model.training
+    model.eval()
+    try:
+        original_image = sitk.ReadImage(val_dataset.cases[sample_idx].image_path)
+        image_tensor, _ = val_dataset.get_src_item(sample_idx)
+        patch_list: list[torch.Tensor] = []
+        for patch_start in range(0, int(images.shape[0]), batch_size):
+            patch_end = min(patch_start + batch_size, int(images.shape[0]))
+            batch_images = images[patch_start:patch_end].to(device)
+            outputs = model(batch_images)
+            patch_list.extend([p.detach().cpu() for p in outputs[:, 0]])
+        _save_predictions(
+            out_dir,
+            epoch,
+            val_dataset,
+            sample_idx,
+            patch_list,
+            image_tensor.shape,
+            original_image,
+        )
+    finally:
+        model.train(was_training)
 
 
 def build_model(cfg: Config, device: torch.device) -> AttentionUnet:
@@ -103,6 +152,7 @@ def main() -> None:
 
     writer = SummaryWriter(log_dir=str(log_dir / "tensorboard"))
     checkpoint_dir = Path(cfg.checkpoint.save_dir)
+    epoch_nifti_dir = log_dir / "epoch_predictions_nifti"
 
     start_epoch, best_dice = 0, 0.0
     if args.resume:
@@ -111,6 +161,14 @@ def main() -> None:
 
     logging.info("Starting training for %d epochs...", cfg.train.epochs)
     for epoch in range(start_epoch, cfg.train.epochs):
+        _save_epoch_start_first_case_nifti(
+            model,
+            val_dataset,
+            device,
+            epoch,
+            epoch_nifti_dir,
+            cfg.train.batch_size,
+        )
         train_loss = train_one_epoch(
             model,
             train_dataset,

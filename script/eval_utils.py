@@ -111,7 +111,7 @@ def combined_loss_with_parts(
         focal_dice_gamma=focal_dice_gamma,
         smooth=smooth,
     )
-    total = (bce + surface_term) / 2
+    total = (bce)
     return total, bce, surface_term
 
 
