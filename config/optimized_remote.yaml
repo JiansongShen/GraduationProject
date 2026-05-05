@@ -20,6 +20,12 @@ train:
   optimizer: "adamw"
   scheduler: "cosine"
   warmup_epochs: 5
+  # 分割表面项: dice | tversky | focal_dice（与 BCE 各半加权）
+  segmentation_surface_loss: "tversky"
+  tversky_alpha: 0.3
+  tversky_beta: 0.7
+  focal_dice_gamma: 1.3333333333333333
+  loss_smooth: 1.0e-6
 
 data:
   train_dirs:
