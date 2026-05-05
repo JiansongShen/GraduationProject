@@ -8,7 +8,7 @@ model:
   use_residual: false
   use_attention: false
   dropout: 0.0
-  norm_type: "batch"  # "batch", "instance", "group"
+  norm_type: "instance"  # "batch", "instance", "group"
   activation: "relu"  # "relu", "leaky_relu", "gelu"
 
 # preset models
