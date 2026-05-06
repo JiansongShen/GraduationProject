@@ -5,20 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b6d86c24-f051-4fb3-bb99-92df58c09d10" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/remote.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/remote.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/MedicalPatchDataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/MedicalPatchDataset.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/patch_sampler.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/patch_sampler.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/appendix.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/appendix.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter1_intro.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter1_intro.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter2_method.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter2_method.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter3_analysis.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter3_analysis.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter4_conclusion.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter4_conclusion.tex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/script/_training.py" beforeDir="false" afterPath="$PROJECT_DIR$/script/_training.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/uv.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/host.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/host.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -268,7 +255,7 @@
       <workItem from="1777707876624" duration="5299000" />
       <workItem from="1777722485868" duration="24746000" />
       <workItem from="1777928496458" duration="11779000" />
-      <workItem from="1778001618020" duration="5129000" />
+      <workItem from="1778001618020" duration="5484000" />
     </task>
     <servers />
   </component>
