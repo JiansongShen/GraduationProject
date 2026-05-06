@@ -450,6 +450,7 @@ def validate(
                 "target_spacing": list(dataset.target_spacing),
                 "origin_suffix": dataset.cfg.origin_suffix,
                 "label_suffixes": dataset.cfg.label_suffixes,
+                "preprocess": dataset.cfg.preprocess,
             },
         }
 
@@ -460,6 +461,7 @@ def validate(
         "target_spacing": list(dataset.target_spacing),
         "origin_suffix": dataset.cfg.origin_suffix,
         "label_suffixes": dataset.cfg.label_suffixes,
+        "preprocess": dataset.cfg.preprocess,
         "eval_case_names": [Path(case.image_path).name for case in dataset.cases],
     }
 

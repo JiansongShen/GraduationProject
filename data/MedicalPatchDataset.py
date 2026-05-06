@@ -16,6 +16,7 @@ from torch.utils.data import Dataset as TorchDataset
 from core.config import DataConfig
 from data.patch_sampler import create_sampler
 from data.patch_utils import crop_patch
+from data.preprocessing import apply_preprocessing, build_preprocess_config
 from data.resample_helper import ResampleHelper, ResampleMeta
 from data.spatial_utils import normalize_image
 from utils.helper import find_all_file_paths_recursively
@@ -43,13 +44,19 @@ class MedicalPatchDataset(TorchDataset):
         self.patches_per_volume = max(1, int(cfg.patches_per_volume))
         self.patch_sampling_mode = cfg.patch_sampling_mode.lower()
         self.background_per_foreground = max(0, int(cfg.background_per_foreground))
+        self.preprocess_cfg = build_preprocess_config(getattr(cfg, "preprocess", None))
+        self.validate_geometry = bool(getattr(cfg, "validate_geometry", False))
         self.rng = random.Random(seed)
         self.resample = ResampleHelper(self.target_spacing)
+        self._foreground_cache: dict[int, dict[str, float]] = {}
 
         self._validate_sampling_mode(self.patch_sampling_mode)
         self.cases = self._build_case_records(cfg.train_dirs)
         if not self.cases:
             raise ValueError("No valid image-label pairs found in train_dirs")
+        if self.validate_geometry:
+            self._validate_case_geometries()
+        self._log_dataset_foreground_summary()
 
     def _validate_sampling_mode(self, mode: str) -> None:
         valid = {"foreground_priority", "foreground_only", "sequential"}
@@ -97,6 +104,58 @@ class MedicalPatchDataset(TorchDataset):
             )
         return records
 
+    def _validate_case_geometries(self) -> None:
+        for case in self.cases:
+            image_itk = sitk.ReadImage(case.image_path)
+            label_itk = sitk.ReadImage(case.label_path)
+            image_geometry = (image_itk.GetSize(), image_itk.GetSpacing(), image_itk.GetOrigin(), image_itk.GetDirection())
+            label_geometry = (label_itk.GetSize(), label_itk.GetSpacing(), label_itk.GetOrigin(), label_itk.GetDirection())
+            if image_geometry != label_geometry:
+                raise ValueError(
+                    "Image/label geometry mismatch before preprocessing: "
+                    f"image={case.image_path} label={case.label_path} "
+                    f"image_geometry={image_geometry} label_geometry={label_geometry}"
+                )
+
+            image_train, _ = self.resample.to_train_space(image_itk, is_label=False)
+            label_train, _ = self.resample.to_train_space(label_itk, is_label=True)
+            train_geometry = (image_train.GetSize(), image_train.GetSpacing(), image_train.GetOrigin(), image_train.GetDirection())
+            label_train_geometry = (label_train.GetSize(), label_train.GetSpacing(), label_train.GetOrigin(), label_train.GetDirection())
+            if train_geometry != label_train_geometry:
+                raise ValueError(
+                    "Image/label geometry mismatch after resampling: "
+                    f"image={case.image_path} label={case.label_path} "
+                    f"image_geometry={train_geometry} label_geometry={label_train_geometry}"
+                )
+
+    def _log_dataset_foreground_summary(self) -> None:
+        total_voxels = 0.0
+        total_foreground_voxels = 0.0
+        per_case_ratios: list[float] = []
+
+        for case_idx, case in enumerate(self.cases):
+            _, label_np, _ = self._load_case(case)
+            foreground_voxels = float((label_np > 0).sum())
+            voxel_count = float(label_np.size)
+            foreground_ratio = foreground_voxels / voxel_count if voxel_count > 0.0 else 0.0
+            self._foreground_cache[case_idx] = {
+                "foreground_voxels": foreground_voxels,
+                "total_voxels": voxel_count,
+                "foreground_ratio": foreground_ratio,
+            }
+            total_foreground_voxels += foreground_voxels
+            total_voxels += voxel_count
+            per_case_ratios.append(foreground_ratio)
+
+        dataset_foreground_ratio = total_foreground_voxels / total_voxels if total_voxels > 0.0 else 0.0
+        mean_case_foreground_ratio = float(np.mean(per_case_ratios)) if per_case_ratios else 0.0
+        logging.info(
+            "Dataset foreground summary | cases=%d | total_foreground_ratio=%.8f | mean_case_foreground_ratio=%.8f",
+            len(self.cases),
+            dataset_foreground_ratio,
+            mean_case_foreground_ratio,
+        )
+
     def _load_case(self, case: CaseRecord) -> tuple[np.ndarray, np.ndarray, ResampleMeta]:
         image_itk = sitk.ReadImage(case.image_path)
         label_itk = sitk.ReadImage(case.label_path)
@@ -106,6 +165,7 @@ class MedicalPatchDataset(TorchDataset):
 
         image_np = sitk.GetArrayFromImage(image_train).astype(np.float32)
         label_np = sitk.GetArrayFromImage(label_train).astype(np.int64)
+        image_np = apply_preprocessing(image_np, self.preprocess_cfg)
         image_np = normalize_image(image_np)
         return image_np, label_np, meta
 
@@ -160,7 +220,17 @@ class MedicalPatchDataset(TorchDataset):
         ppv = int(patches_per_volume or self.patches_per_volume)
 
         starts = self._sample_starts(image, label, mode, ppv)
-        return self._extract_patches(image, label, starts)
+        image_patches, label_patches = self._extract_patches(image, label, starts)
+        foreground_voxels = float((label_patches > 0).sum().item())
+        total_voxels = float(label_patches.numel())
+        logging.info(
+            "Loaded patches | case=%s | mode=%s | patches=%d | foreground_ratio=%.8f",
+            Path(case.image_path).name,
+            mode,
+            int(label_patches.shape[0]),
+            foreground_voxels / total_voxels if total_voxels > 0.0 else 0.0,
+        )
+        return image_patches, label_patches
 
     def get_src_item(self, batch_idx: int) -> tuple[Tensor, Tensor]:
         image, label, _ = self._load_case(self.cases[batch_idx])

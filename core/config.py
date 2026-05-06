@@ -52,6 +52,9 @@ class DataConfig:
     background_per_foreground: int = 2
     max_load: int = 1000
     eval_max_load: int | None = None
+    validate_geometry: bool = False
+    eval_max_load: int | None = None
+    preprocess: dict[str, Any] = field(default_factory=dict)
 
     @property
     def label_suffix(self) -> str:
@@ -182,6 +185,15 @@ def _normalize_data_data(data_data: dict[str, Any]) -> dict[str, Any]:
             label_suffixes = [str(label_suffix)]
     if label_suffixes is not None:
         normalized["label_suffixes"] = [str(item) for item in label_suffixes if str(item)]
+
+    preprocess = normalized.get("preprocess")
+    if isinstance(preprocess, list):
+        normalized["preprocess"] = {"enabled": True, "steps": preprocess}
+    elif isinstance(preprocess, str):
+        normalized["preprocess"] = {"enabled": True, "steps": [preprocess]}
+    elif preprocess is None:
+        normalized["preprocess"] = {}
+
     origin_suffix = normalized.get("origin_suffix")
     file_patterns = normalized.get("file_patterns")
     if not origin_suffix and isinstance(file_patterns, list) and file_patterns:

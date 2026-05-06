@@ -58,7 +58,19 @@ data:
   train_ratio: 0.8
   patches_per_volume: 64
   patch_sampling_mode: "foreground_priority"   # avaiable "foreground_only" "background_priority" "sequential"
-  background_per_foreground: 2    
+  background_per_foreground: 2
+  preprocess:
+    enabled: true
+    steps: ["clahe", "frangi"]  # also accepts historical typo "frgnhi"
+    clahe_clip_limit: 0.01
+    clahe_nb_bins: 256
+    clahe_kernel_size: null
+    frangi_scale_range: [1.0, 5.0]
+    frangi_scale_step: 1.0
+    frangi_alpha: 0.5
+    frangi_beta: 0.5
+    frangi_gamma: null
+    frangi_black_ridges: false
   max_load: 10000
   eval_max_load: 100
 

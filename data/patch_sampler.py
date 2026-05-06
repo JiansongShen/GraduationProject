@@ -150,16 +150,12 @@ class ForegroundSampler(PatchSampler):
         bg_starts = [s for s in self.iter_grid_starts(image.shape) if not self.is_foreground_patch(label, s)]
         bg_cursor = 0
 
-        for _ in range(min(num_patches, len(fg_coords))):
+        max_fg_patches = max(1, num_patches - min(num_patches - 1, self.bg_per_fg))
+        for _ in range(min(max_fg_patches, len(fg_coords))):
             idx = self.rng.randrange(len(fg_coords))
-            cz, cy, cx = fg_coords[idx]
-            oz = self.rng.randint(-self.patch_size[0] // 4, self.patch_size[0] // 4 - 1)
-            oy = self.rng.randint(-self.patch_size[1] // 4, self.patch_size[1] // 4 - 1)
-            ox = self.rng.randint(-self.patch_size[2] // 4, self.patch_size[2] // 4 - 1)
-            sz = int(np.clip(cz + oz, 0, max(0, image.shape[0] - self.patch_size[0])))
-            sy = int(np.clip(cy + oy, 0, max(0, image.shape[1] - self.patch_size[1])))
-            sx = int(np.clip(cx + ox, 0, max(0, image.shape[2] - self.patch_size[2])))
-            selected.append((sz, sy, sx))
+            cz, cy, cx = (int(v) for v in fg_coords[idx])
+            start = self._foreground_center_to_start((cz, cy, cx), image.shape)
+            selected.append(start)
 
             for _ in range(self.bg_per_fg):
                 if len(selected) >= num_patches or bg_cursor >= len(bg_starts):
@@ -167,7 +163,29 @@ class ForegroundSampler(PatchSampler):
                 selected.append(bg_starts[bg_cursor])
                 bg_cursor += 1
 
+        while len(selected) < num_patches:
+            idx = self.rng.randrange(len(fg_coords))
+            cz, cy, cx = (int(v) for v in fg_coords[idx])
+            selected.append(self._foreground_center_to_start((cz, cy, cx), image.shape))
+
         return selected[:num_patches]
+
+    def _foreground_center_to_start(
+        self,
+        center: tuple[int, int, int],
+        shape: tuple[int, int, int],
+    ) -> tuple[int, int, int]:
+        cz, cy, cx = center
+        jitter = tuple(
+            self.rng.randint(-size // 4, size // 4 - 1)
+            for size in self.patch_size
+        )
+        patch_center = (cz + jitter[0], cy + jitter[1], cx + jitter[2])
+        max_start = tuple(max(0, dim - size) for dim, size in zip(shape, self.patch_size))
+        return tuple(
+            int(np.clip(coord - size // 2, 0, limit))
+            for coord, size, limit in zip(patch_center, self.patch_size, max_start)
+        )
 
 
 class ForegroundOnlySampler(PatchSampler):

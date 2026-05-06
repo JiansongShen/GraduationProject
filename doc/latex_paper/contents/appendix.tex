@@ -33,7 +33,7 @@ uvicorn
 
 \subsubsection*{动脉瘤分割模型训练}
 \begin{enumerate}
-	\item 准备数据：将 CTA 与标签整理为 NIfTI，目录结构与文件名模式需满足 YAML 中 \texttt{file\_patterns} 与 \texttt{label\_suffix}；
+	\item 准备数据：将 CTA 与标签整理为 NIfTI，目录结构与文件名模式需满足 YAML 中 \texttt{file\_patterns} 与 \texttt{label\_suffixes}；
 	\item 编辑配置文件：复制 \texttt{config/remote.yaml} 为本地副本，填写 \texttt{data.train\_dirs}、\texttt{eval\_dirs}，并根据显存调整 \texttt{patch\_size}、\texttt{patches\_per\_volume}；
 	\item 启动训练：\texttt{python script/train\_split.py --config path/to/your.yaml}，必要时附加 \texttt{--resume checkpoints/best.pth}；
 	\item 监控与评估：浏览器打开 TensorBoard（\texttt{tensorboard --logdir logs/tensorboard}），周期性查看验证 Dice；如需离线评测整例体积，调用 \texttt{eval\_split.py}。
