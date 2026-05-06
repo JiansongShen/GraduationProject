@@ -25,9 +25,9 @@
 \begin{enumerate}
 	\item 基于 \texttt{AttentionUnet} 实现三维分割网络，完成编码器—解码器通道配置、注意力门控与 sigmoid 输出的端到端前向；
 	\item 在 \texttt{MedicalPatchDataset} 上实现多目录数据扫描、重采样、标准化及前景优先/顺序采样策略，支撑低显存条件下的长时间训练；
-	\item 基于 Dice/Tversky/Focal 与 BCE 的组合损失、Adam/AdamW/SGD 与余弦退火等配置化优化流程，训练过程写入 TensorBoard，并按间隔保存 \texttt{latest.pth} 与验证集最优 \texttt{best.pth}；
+	\item 基于 Dice/Tversky/Focal 与 BCE 的组合损失、Adam/AdamW/SGD 与余弦退火等配置化优化流程，训练过程写入 TensorBoard，并按间隔保存最新模型与验证集最优 \texttt{best.pth}；
 	\item 推理阶段将补丁结果拼接为完整体积，恢复 spacing、origin、direction，输出概率体与二值掩膜供可视化或形态学特征提取；
-	\item 构建表格风险数据的清洗、互信息特征筛选、加权 BCE 训练、验证集 F1 最优阈值搜索及测试集报告导出（\texttt{risk\_report.json}）；
+	\item 构建表格风险数据的清洗、互信息特征筛选、加权 BCE 训练、验证集 F1 最优阈值搜索及测试集报告导出；
 	\item 提供 FastAPI 交互界面，串联上传、分割与风险预测演示流程。
 \end{enumerate}
 

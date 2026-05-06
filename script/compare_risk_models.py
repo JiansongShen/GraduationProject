@@ -203,7 +203,9 @@ def _train_traditional_models(cfg: Config, model_names: list[str]) -> tuple[dict
         raise ValueError(f"Missing risk label column: {label_column}")
 
     feature_columns = _read_feature_columns(risk_cfg.feature_columns_output)
-    selected = [c for c in list(risk_cfg.clinic_columns) + feature_columns if c in df.columns and c != label_column]
+    feature_columns = [c for c in feature_columns if not str(c).startswith("diagnostics_")]
+    clinic_columns = [c for c in list(risk_cfg.clinic_columns) if not str(c).startswith("diagnostics_")]
+    selected = [c for c in clinic_columns + feature_columns if c in df.columns and c != label_column]
     if not selected:
         raise ValueError("No usable risk feature columns found; run script/init_risk_train.py first or configure clinic_columns")
 
