@@ -8,11 +8,11 @@ model:
 train:
   epochs: 100
   batch_size: 1
-  learning_rate: 1.0e-3
+  learning_rate: 1.0e-4
   weight_decay: 1.0e-5
   patch_size: [32, 32, 32]
   max_patches_per_volume: 64
-  optimizer: "adam"
+  optimizer: "adamw"
   scheduler: "cosine"
   warmup_epochs: 5
   # 分割表面项: dice | tversky | focal_dice（与 BCE 各半加权）

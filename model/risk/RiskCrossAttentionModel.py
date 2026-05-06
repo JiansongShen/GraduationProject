@@ -71,8 +71,7 @@ class RiskCrossAttentionModel(nn.Module):
         cat_tokens = torch.cat(embedded_tokens, dim=1)
         return self.categorical_proj(cat_tokens)
 
-    def forward(self, numeric_x: torch.Tensor, categorical_x: torch.Tensor) -> torch.Tensor:
-        """Return risk probability in [0, 1]."""
+    def forward_logits(self, numeric_x: torch.Tensor, categorical_x: torch.Tensor) -> torch.Tensor:
         numeric_tokens = self._build_numeric_tokens(numeric_x)
         categorical_tokens = self._build_categorical_tokens(categorical_x)
 
@@ -87,8 +86,11 @@ class RiskCrossAttentionModel(nn.Module):
         pooled_numeric = numeric_tokens.mean(dim=1)
         pooled_categorical = categorical_tokens.mean(dim=1)
         fused = torch.cat((pooled_numeric, pooled_categorical), dim=1)
-        logits = self.output_head(fused)
-        return torch.sigmoid(logits).squeeze(1)
+        return self.output_head(fused).squeeze(1)
+
+    def forward(self, numeric_x: torch.Tensor, categorical_x: torch.Tensor) -> torch.Tensor:
+        """Return risk probability in [0, 1]."""
+        return torch.sigmoid(self.forward_logits(numeric_x, categorical_x))
 
     @staticmethod
     def parameter_count(model: nn.Module) -> int:

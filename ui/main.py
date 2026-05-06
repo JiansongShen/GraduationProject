@@ -161,7 +161,7 @@ async def segment_cta(
     dataset_ready_volume_path = prepare_uploaded_volume_for_dataset(
         uploaded_file=uploaded_cta_path,
         destination_directory=inference_workspace,
-        file_patterns=list(segmentation_configuration.data.file_patterns),
+        file_patterns=[f"*{segmentation_configuration.data.origin_suffix}"],
         upload_identifier=upload_identifier,
     )
 

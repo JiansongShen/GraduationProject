@@ -72,14 +72,13 @@ def _find_best_threshold(
     return best_threshold, best_acc, best_f1
 
 
-def _weighted_bce_loss(
-    pred_prob: torch.Tensor,
+def _weighted_bce_with_logits_loss(
+    logits: torch.Tensor,
     target: torch.Tensor,
     pos_weight: float,
 ) -> torch.Tensor:
-    pred_prob = pred_prob.clamp(min=1e-6, max=1.0 - 1e-6)
-    weighted_log_likelihood = pos_weight * target * torch.log(pred_prob) + (1.0 - target) * torch.log(1.0 - pred_prob)
-    return -weighted_log_likelihood.mean()
+    pos_weight_tensor = torch.tensor(pos_weight, device=logits.device, dtype=logits.dtype)
+    return torch.nn.functional.binary_cross_entropy_with_logits(logits, target, pos_weight=pos_weight_tensor)
 
 
 def _run_epoch(
@@ -113,8 +112,9 @@ def _run_epoch(
             optimizer.zero_grad()
 
         with torch.set_grad_enabled(is_train):
-            pred_prob = model(x_num, x_cat)
-            loss = _weighted_bce_loss(pred_prob, y, pos_weight=pos_weight)
+            logits = model.forward_logits(x_num, x_cat)
+            pred_prob = torch.sigmoid(logits)
+            loss = _weighted_bce_with_logits_loss(logits, y, pos_weight=pos_weight)
             if is_train:
                 loss.backward()
                 optimizer.step()
@@ -188,7 +188,7 @@ def main() -> None:
     val_set = RiskTabularDataset(bundle.x_num_val, bundle.x_cat_val, bundle.y_val)
     test_set = RiskTabularDataset(bundle.x_num_test, bundle.x_cat_test, bundle.y_test)
 
-    train_loader = DataLoader(train_set, batch_size=risk_cfg.batch_size, shuffle=True)
+    train_loader = DataLoader(train_set, batch_size=risk_cfg.batch_size, shuffle=True, drop_last=True)
     val_loader = DataLoader(val_set, batch_size=risk_cfg.batch_size, shuffle=False)
     test_loader = DataLoader(test_set, batch_size=risk_cfg.batch_size, shuffle=False)
 

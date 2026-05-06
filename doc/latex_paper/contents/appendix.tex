@@ -1,20 +1,21 @@
-\subsection*{项目结构说明}
-本项目采用模块化目录布局，便于分工协作与单元测试：
+\section*{附录A：关键配置与复现实验步骤}
+\addcontentsline{toc}{section}{附录A：关键配置与复现实验步骤}
+
+\subsection*{A.1 项目结构说明}
+本项目采用模块化目录布局，便于维护、扩展与复现实验：
 \begin{itemize}
-	\item \texttt{core/}：配置数据结构、YAML 加载与全局随机种子等；
-	\item \texttt{data/}：\texttt{MedicalPatchDataset} 体数据管线、\texttt{risk\_tabular} 表格风险数据打包；
-	\item \texttt{model/}：\texttt{aneurysm} 子包存放 Attention U-Net 及组件，\texttt{risk} 子包存放交叉注意力风险模型；
-	\item \texttt{script/}：\texttt{train\_split.py}、\texttt{train\_risk.py}、\texttt{eval\_split.py}、\texttt{eval\_risk.py} 等入口脚本；
-	\item \texttt{ui/}：FastAPI 服务与分割辅助函数；
-	\item \texttt{utils/}：日志与通用工具。
+\item \texttt{core/}：配置数据结构、YAML 加载与随机种子管理；
+\item \texttt{data/}：医学影像补丁数据管线与风险表格数据处理；
+\item \texttt{model/}：分割模型（\texttt{aneurysm}）与风险模型（\texttt{risk}）；
+\item \texttt{script/}：训练、评估与对比实验入口脚本；
+\item \texttt{ui/}：FastAPI 服务与推理接口封装；
+\item \texttt{utils/}：日志、路径与通用工具函数。
 \end{itemize}
 
-\subsection*{环境配置}
+\subsection*{A.2 环境配置建议}
 \begin{verbatim}
-# Python 建议 3.10+（需与 PyTorch 官方 wheel 匹配）
 Python >= 3.8
 
-# 核心依赖（示例版本号以 environment.yml / 线下测试为准）
 torch>=1.9.0
 monai>=0.7.0
 numpy>=1.21.0
@@ -26,51 +27,37 @@ tqdm
 fastapi
 uvicorn
 \end{verbatim}
+建议安装后执行 \texttt{python -c "import torch; print(torch.cuda.is\_available())"} 验证 GPU 可用性。
 
-安装完成后，可通过 \texttt{python -c "import torch; print(torch.cuda.is\_available())"} 快速检查 GPU 是否对 PyTorch 可见。
-
-\subsection*{训练流程说明}
-
-\subsubsection*{动脉瘤分割模型训练}
+\subsection*{A.3 分割任务复现实验步骤}
 \begin{enumerate}
-	\item 准备数据：将 CTA 与标签整理为 NIfTI，目录结构与文件名模式需满足 YAML 中 \texttt{file\_patterns} 与 \texttt{label\_suffixes}；
-	\item 编辑配置文件：复制 \texttt{config/remote.yaml} 为本地副本，填写 \texttt{data.train\_dirs}、\texttt{eval\_dirs}，并根据显存调整 \texttt{patch\_size}、\texttt{patches\_per\_volume}；
-	\item 启动训练：\texttt{python script/train\_split.py --config path/to/your.yaml}，必要时附加 \texttt{--resume checkpoints/best.pth}；
-	\item 监控与评估：浏览器打开 TensorBoard（\texttt{tensorboard --logdir logs/tensorboard}），周期性查看验证 Dice；如需离线评测整例体积，调用 \texttt{eval\_split.py}。
+\item 准备 NIfTI 影像与标签数据，确保命名规则与配置文件一致；
+\item 复制并修改配置文件（如 \texttt{config/host.yaml}），填写训练/验证路径；
+\item 运行训练命令：\texttt{python script/train\_split.py --config path/to/your.yaml}；
+\item 通过 TensorBoard 观察收敛曲线并记录最优检查点；
+\item 运行评估脚本导出指标与可视化结果。
 \end{enumerate}
 
-\subsubsection*{破裂风险预测模型训练}
+\subsection*{A.4 风险预测复现实验步骤}
 \begin{enumerate}
-	\item 准备表格数据：Excel/CSV 中包含标签列与病例 ID 列；
-	\item 在同一 YAML 中打开 \texttt{risk.enabled: true}，配置 \texttt{excel\_path}、\texttt{label\_column}、\texttt{id\_column}、特征筛选策略等；
-	\item 运行 \texttt{python script/train\_risk.py --config path/to/your.yaml}；
-	\item 在输出目录查看 \texttt{risk\_cross\_attention.pt} 与 \texttt{risk\_report.json}，记录测试集 AUC、F1 与最优阈值。
+\item 准备包含标签列与病例 ID 的表格数据（Excel/CSV）；
+\item 在配置中启用风险模块并设置特征与训练参数；
+\item 运行训练命令：\texttt{python script/train\_risk.py --config path/to/your.yaml}；
+\item 查看输出 \texttt{risk\_report.json} 并记录 F1、AUC 与最优阈值；
+\item 可选运行 \texttt{compare\_risk\_models.py} 与传统模型进行统一对比。
 \end{enumerate}
 
-\subsection*{关键配置参数说明（与仓库默认值对齐）}
-
-\subsubsection*{分割相关}
+\subsection*{A.5 关键参数说明}
 \begin{itemize}
-	\item \texttt{train.epochs}：总训练轮数（示例：40）；
-	\item \texttt{train.batch\_size}：当前实现按病例循环，通常保持 1；
-	\item \texttt{train.patch\_size}：补丁立方体边长列表，如 \texttt{[128,128,128]}；
-	\item \texttt{train.learning\_rate}：初始学习率（示例：$10^{-3}$）；
-	\item \texttt{train.optimizer}：\texttt{adam}/\texttt{adamw}/\texttt{sgd}；
-	\item \texttt{train.scheduler}：\texttt{cosine}/\texttt{step}/\texttt{none}；
-	\item \texttt{train.warmup\_epochs}：写入配置的热身轮数（可与调度器联动扩展）；
-	\item \texttt{data.patch\_sampling\_mode}：训练推荐 \texttt{foreground\_priority}，验证/推理常用 \texttt{sequential}；
-	\item \texttt{checkpoint.save\_interval}：周期性额外保存间隔；
-	\item \texttt{eval\_interval}：每隔多少个 epoch 做一次验证并刷新最优模型。
+\item 分割参数：\texttt{train.epochs}、\texttt{train.patch\_size}、\texttt{train.learning\_rate}、\texttt{eval\_interval}；
+\item 风险参数：\texttt{risk.hidden\_dim}、\texttt{risk.num\_heads}、\texttt{risk.num\_layers}、\texttt{risk.threshold\_search\_steps}；
+\item 数据参数：\texttt{data.patch\_sampling\_mode}、\texttt{risk.feature\_select\_method}。
 \end{itemize}
 
-\subsubsection*{风险相关}
+\subsection*{A.6 常见问题与排查建议}
 \begin{itemize}
-	\item \texttt{risk.hidden\_dim}、\texttt{risk.num\_heads}、\texttt{risk.num\_layers}：交叉注意力宽度与深度；
-	\item \texttt{risk.epochs}、\texttt{risk.batch\_size}、\texttt{risk.learning\_rate}：表格模型优化超参；
-	\item \texttt{risk.feature\_select\_method}：如 \texttt{mutual\_info}；
-	\item \texttt{risk.auto\_max\_features}：自动筛选后保留的最大特征数；
-	\item \texttt{risk.threshold\_search\_steps}：验证集阈值扫描离散点数（默认代码中为 19 个采样点）。
+\item \textbf{显存不足}：减小 \texttt{patch\_size} 或减少每例补丁数量；
+\item \textbf{训练不收敛}：检查学习率、标签映射及数据归一化流程；
+\item \textbf{指标异常波动}：固定随机种子并核查数据划分一致性；
+\item \textbf{LaTeX 目录报错}：清理 \texttt{.aux/.toc/.out} 后重新编译。
 \end{itemize}
-
-\subsection*{推理与演示}
-命令行推理脚本（若仓库提供）或 UI 服务均可加载训练产物：UI 默认读取 \texttt{config/host.yaml}，可通过启动参数 \texttt{--config} 指向含本地权重的副本。部署在内网环境时，建议关闭不必要的 CORS 全开策略并增加访问控制。
