@@ -171,6 +171,24 @@ def _update_auc_histograms(
     return pos_hist, neg_hist
 
 
+def _update_threshold_confusions(
+    prob: torch.Tensor,
+    target: torch.Tensor,
+    thresholds: list[float],
+    confusion_by_threshold: dict[str, dict[str, float]],
+) -> dict[str, dict[str, float]]:
+    target_bool = target >= 0.5
+    for threshold in thresholds:
+        pred = prob >= threshold
+        key = f"{threshold:.2f}"
+        confusion = confusion_by_threshold[key]
+        confusion["tp"] += float((pred & target_bool).sum().item())
+        confusion["tn"] += float((~pred & ~target_bool).sum().item())
+        confusion["fp"] += float((pred & ~target_bool).sum().item())
+        confusion["fn"] += float((~pred & target_bool).sum().item())
+    return confusion_by_threshold
+
+
 def _histogram_auc(pos_hist: np.ndarray, neg_hist: np.ndarray) -> float:
     pos_total = float(pos_hist.sum())
     neg_total = float(neg_hist.sum())
@@ -260,6 +278,10 @@ def validate(
     fp = 0.0
     fn = 0.0
     threshold = 0.5
+    threshold_sweep = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+    confusion_by_threshold = {
+        f"{thr:.2f}": {"tp": 0.0, "tn": 0.0, "fp": 0.0, "fn": 0.0} for thr in threshold_sweep
+    }
     auc_bins = 1024
     pos_hist = np.zeros(auc_bins, dtype=np.float64)
     neg_hist = np.zeros(auc_bins, dtype=np.float64)
@@ -300,6 +322,12 @@ def validate(
                 tn += counts["tn"]
                 fp += counts["fp"]
                 fn += counts["fn"]
+                confusion_by_threshold = _update_threshold_confusions(
+                    detached_outputs,
+                    detached_labels,
+                    threshold_sweep,
+                    confusion_by_threshold,
+                )
                 pos_hist, neg_hist = _update_auc_histograms(detached_outputs, detached_labels, pos_hist, neg_hist)
                 positive_voxel_count += float((detached_labels >= 0.5).sum().item())
                 total_voxel_count += float(detached_labels.numel())
@@ -310,18 +338,39 @@ def validate(
     avg_aux = total_aux / max(num_batches, 1)
     voxel_auc = _histogram_auc(pos_hist, neg_hist)
     voxel_metrics = _metrics_from_confusion_counts(tp, tn, fp, fn)
+    threshold_metrics: dict[str, dict[str, float]] = {}
+    for threshold_key, confusion in confusion_by_threshold.items():
+        metrics = _metrics_from_confusion_counts(
+            confusion["tp"],
+            confusion["tn"],
+            confusion["fp"],
+            confusion["fn"],
+        )
+        total_at_threshold = confusion["tp"] + confusion["tn"] + confusion["fp"] + confusion["fn"]
+        metrics["threshold"] = float(threshold_key)
+        metrics["pred_positive_ratio"] = (
+            (confusion["tp"] + confusion["fp"]) / total_at_threshold if total_at_threshold > 0.0 else 0.0
+        )
+        threshold_metrics[threshold_key] = metrics
+    best_threshold_key = max(threshold_metrics, key=lambda key: threshold_metrics[key]["f1"]) if threshold_metrics else "0.50"
+    best_threshold_metrics = threshold_metrics.get(best_threshold_key, voxel_metrics)
     pred_positive_ratio = (tp + fp) / total_voxel_count if total_voxel_count > 0.0 else 0.0
     gt_positive_ratio = positive_voxel_count / total_voxel_count if total_voxel_count > 0.0 else 0.0
     writer.add_scalar("Loss/val", avg_loss, epoch)
     writer.add_scalar("Dice/val", avg_dice, epoch)
     writer.add_scalar("AUC/val_voxel", voxel_auc, epoch)
     writer.add_scalar("F1/val_voxel", voxel_metrics["f1"], epoch)
+    writer.add_scalar("F1/val_voxel_best_threshold", best_threshold_metrics["f1"], epoch)
     logging.info(
-        "Validation - Loss: %.4f, Dice: %.4f, AUC: %.4f, F1: %.4f",
+        "Validation - Loss: %.4f, Dice: %.4f, AUC: %.4f, F1@0.50: %.4f, BestF1: %.4f@thr=%.2f, Recall@best: %.4f, PredPos@best: %.6f",
         avg_loss,
         avg_dice,
         voxel_auc,
         voxel_metrics["f1"],
+        best_threshold_metrics["f1"],
+        best_threshold_metrics["threshold"],
+        best_threshold_metrics["recall"],
+        best_threshold_metrics["pred_positive_ratio"],
     )
 
     report: dict[str, Any] = {
@@ -353,6 +402,11 @@ def validate(
                 "threshold": threshold,
                 "pred_positive_ratio": pred_positive_ratio,
                 "gt_positive_ratio": gt_positive_ratio,
+                "best_f1_threshold": best_threshold_metrics["threshold"],
+                "best_f1": best_threshold_metrics["f1"],
+                "best_f1_recall": best_threshold_metrics["recall"],
+                "best_f1_precision": best_threshold_metrics["precision"],
+                "best_f1_pred_positive_ratio": best_threshold_metrics["pred_positive_ratio"],
             },
             "confusion_matrix": {
                 "tp": voxel_metrics["tp"],
@@ -360,6 +414,7 @@ def validate(
                 "fp": voxel_metrics["fp"],
                 "fn": voxel_metrics["fn"],
             },
+            "threshold_sweep": threshold_metrics,
             "sampling": {
                 "num_cases": num_cases,
                 "num_batches": num_batches,
