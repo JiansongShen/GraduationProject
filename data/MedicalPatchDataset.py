@@ -48,7 +48,6 @@ class MedicalPatchDataset(TorchDataset):
         self.validate_geometry = bool(getattr(cfg, "validate_geometry", False))
         self.rng = random.Random(seed)
         self.resample = ResampleHelper(self.target_spacing)
-        self._foreground_cache: dict[int, dict[str, float]] = {}
 
         self._validate_sampling_mode(self.patch_sampling_mode)
         self.cases = self._build_case_records(cfg.train_dirs)
@@ -56,7 +55,6 @@ class MedicalPatchDataset(TorchDataset):
             raise ValueError("No valid image-label pairs found in train_dirs")
         if self.validate_geometry:
             self._validate_case_geometries()
-        self._log_dataset_foreground_summary()
 
     def _validate_sampling_mode(self, mode: str) -> None:
         valid = {"foreground_priority", "foreground_only", "sequential"}
@@ -127,34 +125,6 @@ class MedicalPatchDataset(TorchDataset):
                     f"image={case.image_path} label={case.label_path} "
                     f"image_geometry={train_geometry} label_geometry={label_train_geometry}"
                 )
-
-    def _log_dataset_foreground_summary(self) -> None:
-        total_voxels = 0.0
-        total_foreground_voxels = 0.0
-        per_case_ratios: list[float] = []
-
-        for case_idx, case in enumerate(self.cases):
-            _, label_np, _ = self._load_case(case)
-            foreground_voxels = float((label_np > 0).sum())
-            voxel_count = float(label_np.size)
-            foreground_ratio = foreground_voxels / voxel_count if voxel_count > 0.0 else 0.0
-            self._foreground_cache[case_idx] = {
-                "foreground_voxels": foreground_voxels,
-                "total_voxels": voxel_count,
-                "foreground_ratio": foreground_ratio,
-            }
-            total_foreground_voxels += foreground_voxels
-            total_voxels += voxel_count
-            per_case_ratios.append(foreground_ratio)
-
-        dataset_foreground_ratio = total_foreground_voxels / total_voxels if total_voxels > 0.0 else 0.0
-        mean_case_foreground_ratio = float(np.mean(per_case_ratios)) if per_case_ratios else 0.0
-        logging.info(
-            "Dataset foreground summary | cases=%d | total_foreground_ratio=%.8f | mean_case_foreground_ratio=%.8f",
-            len(self.cases),
-            dataset_foreground_ratio,
-            mean_case_foreground_ratio,
-        )
 
     def _load_case(self, case: CaseRecord) -> tuple[np.ndarray, np.ndarray, ResampleMeta]:
         image_itk = sitk.ReadImage(case.image_path)
