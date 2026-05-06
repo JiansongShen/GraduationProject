@@ -99,6 +99,10 @@ def build_model(cfg: Config, device: torch.device) -> AttentionUnet:
         norm_type=cfg.model.norm_type,
         activation=cfg.model.activation,
         dropout=cfg.model.dropout,
+        use_coord_attention=cfg.model.use_coord_attention,
+        coord_reduction=cfg.model.coord_reduction,
+        use_aspp=cfg.model.use_aspp,
+        aspp_dilations=cfg.model.aspp_dilations,
     )
     return model.to(device)
 

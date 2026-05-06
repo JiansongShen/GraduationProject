@@ -221,7 +221,7 @@ def main() -> None:
     best_threshold = 0.5
     current_threshold = 0.5
     best_state: dict[str, torch.Tensor] | None = None
-    best_val_loss = float("inf")
+    best_stop_auc = 0.5
     early_stop_counter = 0
     for epoch in range(risk_cfg.epochs):
         train_loss, train_acc, train_f1, train_auc, _, _ = _run_epoch(
@@ -265,14 +265,14 @@ def main() -> None:
             best_threshold = current_threshold
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
-        if val_loss + risk_cfg.early_stopping_min_delta < best_val_loss:
-            best_val_loss = val_loss
+        if val_auc > best_stop_auc + risk_cfg.early_stopping_min_delta:
+            best_stop_auc = val_auc
             early_stop_counter = 0
         else:
             early_stop_counter += 1
             if early_stop_counter >= risk_cfg.early_stopping_patience:
                 logging.info(
-                    "Early stopping triggered at epoch %d (patience=%d, min_delta=%.6f).",
+                    "Early stopping triggered at epoch %d by val_auc (patience=%d, min_delta=%.6f).",
                     epoch + 1,
                     risk_cfg.early_stopping_patience,
                     risk_cfg.early_stopping_min_delta,

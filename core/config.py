@@ -13,6 +13,10 @@ class ModelConfig:
     dropout: float = 0.0
     norm_type: str = "instance"
     activation: str = "relu"
+    use_coord_attention: bool = True
+    coord_reduction: int = 16
+    use_aspp: bool = True
+    aspp_dilations: tuple[int, ...] = (1, 2, 4, 6)
 
 
 @dataclass
@@ -137,6 +141,9 @@ class Config:
                 "batch_size": overlap_data.get("batch_size"),
                 "use_amp": overlap_data.get("use_amp"),
             }
+
+        if isinstance(model_data.get("aspp_dilations"), list):
+            model_data["aspp_dilations"] = tuple(int(v) for v in model_data["aspp_dilations"])
 
         train_data = _normalize_train_data(train_data)
         data_data = _normalize_data_data(data_data)

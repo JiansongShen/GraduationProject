@@ -80,7 +80,11 @@ def _collect_feature_names(saved_data_dir: Path) -> list[str]:
             predict_res_path=str(label_path),
             src_path=str(origin_path),
         )
-        numeric_feature_names = [key for key, value in features.items() if isinstance(value, (int, float))]
+        numeric_feature_names = [
+            key
+            for key, value in features.items()
+            if isinstance(value, (int, float)) and not str(key).startswith("diagnostics_")
+        ]
         feature_names.update(numeric_feature_names)
 
     if matched == 0:
@@ -110,7 +114,9 @@ def main() -> None:
     radiomics_feature_names = _collect_feature_names(saved_data_dir)
     risk_columns = _read_table_columns(riskdataset_path)
     protected = set(cfg.risk.clinic_columns + [cfg.risk.label_column])
-    risk_feature_columns = sorted(set(risk_columns) - protected)
+    risk_feature_columns = sorted(
+        col for col in (set(risk_columns) - protected) if not str(col).startswith("diagnostics_")
+    )
     intersection = sorted(set(radiomics_feature_names).intersection(risk_feature_columns))
     missing_from_radiomics = sorted(set(risk_feature_columns) - set(radiomics_feature_names))
 

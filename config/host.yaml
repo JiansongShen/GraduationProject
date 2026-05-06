@@ -27,7 +27,7 @@ data:
     - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
     # - "/home/napbad/project/graduate_proj/core_model/dataset/MultiCrop"
   eval_dirs:
-    - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
+    - "/home/napbad/project/graduate_proj/core_model/dataset/Single"
     # - "/home/napbad/project/graduate_proj/core_model/dataset/Multi"
   num_workers: 2
   prefetch_factor: 2
@@ -73,19 +73,22 @@ risk:
   dummy_num_rows: 512
   metadata_columns: ["年龄", "性别", "部位"]
   num_heads: 4
-  hidden_dim: 128
-  num_layers: 5
-  dropout: 0.1
-  epochs: 5000
+  hidden_dim: 32
+  num_layers: 1
+  dropout: 0.35
+  epochs: 500
   batch_size: 64
-  learning_rate: 1.0e-3
-  weight_decay: 1.0e-4
+  learning_rate: 2.0e-4
+  weight_decay: 5.0e-4
   test_size: 0.2
   val_size: 0.1
   random_state: 42
   auto_max_features: 300
   feature_select_method: "mutual_info"
   categorical_min_frequency: 5
+  early_stopping_patience: 60
+  early_stopping_min_delta: 1.0e-4
+  threshold_search_steps: 37
   use_pyradiomics_overlap_only: true
   clinic_columns: ["性别", "年龄", "高血压", "心脏病", "糖尿病", "脑血管硬化", "饮酒", "抽烟", "出血史"]
   saved_data_dir: "data/saved_data"

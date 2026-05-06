@@ -106,7 +106,9 @@ def _build_dataframe_splits(cfg: Config) -> tuple[Any, Any, Any, list[str], list
     df = _clean_columns(_read_risk_table(risk_cfg.riskdataset_path))
     label_column = risk_cfg.label_column
     feature_columns = _read_feature_columns(risk_cfg.feature_columns_output)
-    selected = [c for c in list(risk_cfg.clinic_columns) + feature_columns if c in df.columns and c != label_column]
+    feature_columns = [c for c in feature_columns if not str(c).startswith("diagnostics_")]
+    clinic_columns = [c for c in list(risk_cfg.clinic_columns) if not str(c).startswith("diagnostics_")]
+    selected = [c for c in clinic_columns + feature_columns if c in df.columns and c != label_column]
     if not selected:
         raise ValueError("No usable risk feature columns found; run script/init_risk_train.py first or configure clinic_columns")
 
@@ -190,7 +192,7 @@ def _build_preprocessor(numeric_columns: list[str], categorical_columns: list[st
     return ColumnTransformer(transformers=transformers)
 
 
-def _train_traditional_models(cfg: Config, model_names: list[str]) -> dict[str, Any]:
+def _train_traditional_models(cfg: Config, model_names: list[str]) -> tuple[dict[str, Any], dict[str, Any]]:
     import pandas as pd
     from sklearn.model_selection import train_test_split
 
@@ -231,6 +233,17 @@ def _train_traditional_models(cfg: Config, model_names: list[str]) -> dict[str, 
     )
 
     results: dict[str, Any] = {}
+    artifacts: dict[str, Any] = {
+        "x_train": x_train,
+        "x_val": x_val,
+        "x_test": x_test,
+        "y_train": y_train,
+        "y_val": y_val,
+        "y_test": y_test,
+        "numeric_columns": numeric_columns,
+        "categorical_columns": categorical_columns,
+        "pipelines": {},
+    }
     for name in model_names:
         estimator = TRADITIONAL_MODEL_BUILDERS[name]()
         pipeline = Pipeline([
@@ -238,6 +251,7 @@ def _train_traditional_models(cfg: Config, model_names: list[str]) -> dict[str, 
             ("model", estimator),
         ])
         pipeline.fit(x_train, y_train)
+        artifacts["pipelines"][name] = pipeline
         val_prob = pipeline.predict_proba(x_val)[:, 1]
         best_threshold, val_metrics = _find_best_threshold_numpy(y_val, val_prob, steps=risk_cfg.threshold_search_steps)
         test_prob = pipeline.predict_proba(x_test)[:, 1]
@@ -261,10 +275,10 @@ def _train_traditional_models(cfg: Config, model_names: list[str]) -> dict[str, 
             test_metrics["f1"],
             test_metrics["auc"],
         )
-    return results
+    return results, artifacts
 
 
-def _train_cross_attention(cfg: Config, device_override: str | None = None) -> dict[str, Any]:
+def _train_cross_attention(cfg: Config, device_override: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     risk_cfg = cfg.risk
     device_name = device_override or cfg.device
     device = torch.device(device_name if torch.cuda.is_available() and device_name.startswith("cuda") else "cpu")
@@ -374,7 +388,7 @@ def _train_cross_attention(cfg: Config, device_override: str | None = None) -> d
     test_metrics["f1"] = float(test_f1)
     test_metrics["auc"] = float(test_auc)
 
-    return {
+    result = {
         "model_name": "risk_cross_attention",
         "type": "deep_model",
         "validation": best_val_metrics,
@@ -386,6 +400,63 @@ def _train_cross_attention(cfg: Config, device_override: str | None = None) -> d
         "n_val": int(len(bundle.y_val)),
         "n_test": int(len(bundle.y_test)),
         "pos_weight": float(pos_weight),
+    }
+    artifacts = {
+        "val_probs": val_probs.detach().cpu().numpy(),
+        "val_targets": val_targets.detach().cpu().numpy(),
+        "test_probs": test_probs.detach().cpu().numpy(),
+        "test_targets": test_targets.detach().cpu().numpy(),
+        "best_threshold": float(best_threshold),
+    }
+    return result, artifacts
+
+
+def _build_forest_attention_ensemble(
+    traditional_artifacts: dict[str, Any],
+    cross_attention_artifacts: dict[str, Any],
+    threshold_steps: int,
+) -> dict[str, Any]:
+    rf_pipeline = traditional_artifacts["pipelines"].get("random_forest")
+    if rf_pipeline is None:
+        raise ValueError("random_forest must be included in --models for forest+attention ensemble")
+
+    x_val = traditional_artifacts["x_val"]
+    x_test = traditional_artifacts["x_test"]
+    y_val = np.asarray(traditional_artifacts["y_val"])
+    y_test = np.asarray(traditional_artifacts["y_test"])
+
+    rf_val_prob = rf_pipeline.predict_proba(x_val)[:, 1]
+    rf_test_prob = rf_pipeline.predict_proba(x_test)[:, 1]
+    attn_val_prob = np.asarray(cross_attention_artifacts["val_probs"], dtype=np.float64)
+    attn_test_prob = np.asarray(cross_attention_artifacts["test_probs"], dtype=np.float64)
+
+    best_weight = 0.5
+    best_threshold = 0.5
+    best_val_metrics = _binary_metrics_numpy(y_val, 0.5 * rf_val_prob + 0.5 * attn_val_prob, threshold=0.5)
+    for w in np.linspace(0.1, 0.9, 17):
+        val_prob = w * rf_val_prob + (1.0 - w) * attn_val_prob
+        threshold, metrics = _find_best_threshold_numpy(y_val, val_prob, steps=threshold_steps)
+        if metrics["f1"] > best_val_metrics["f1"]:
+            best_val_metrics = metrics
+            best_weight = float(w)
+            best_threshold = float(threshold)
+
+    ensemble_test_prob = best_weight * rf_test_prob + (1.0 - best_weight) * attn_test_prob
+    test_metrics = _binary_metrics_numpy(y_test, ensemble_test_prob, threshold=best_threshold)
+
+    return {
+        "model_name": "forest_attention_ensemble",
+        "type": "hybrid_ensemble",
+        "validation": best_val_metrics,
+        "test": test_metrics,
+        "blend": {
+            "random_forest_weight": best_weight,
+            "cross_attention_weight": 1.0 - best_weight,
+            "selected_threshold": best_threshold,
+        },
+        "n_train": int(len(traditional_artifacts["y_train"])),
+        "n_val": int(len(y_val)),
+        "n_test": int(len(y_test)),
     }
 
 
@@ -426,11 +497,18 @@ def main() -> None:
     SystemSetting.set_seed(cfg.seed)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    cross_attention_result = _train_cross_attention(cfg, device_override=args.device)
-    traditional_results = _train_traditional_models(cfg, args.models)
+    cross_attention_result, cross_attention_artifacts = _train_cross_attention(cfg, device_override=args.device)
+    traditional_results, traditional_artifacts = _train_traditional_models(cfg, args.models)
 
     all_results: dict[str, Any] = {cross_attention_result["model_name"]: cross_attention_result}
     all_results.update(traditional_results)
+    if "random_forest" in traditional_results:
+        ensemble_result = _build_forest_attention_ensemble(
+            traditional_artifacts=traditional_artifacts,
+            cross_attention_artifacts=cross_attention_artifacts,
+            threshold_steps=cfg.risk.threshold_search_steps,
+        )
+        all_results[ensemble_result["model_name"]] = ensemble_result
     ranking = sorted(all_results.keys(), key=lambda name: all_results[name]["test"]["f1"], reverse=True)
 
     save_dir = Path(cfg.risk.save_dir)

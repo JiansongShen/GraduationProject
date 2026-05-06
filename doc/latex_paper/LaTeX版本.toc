@@ -17,7 +17,7 @@
 \contentsline {subsection}{\numberline {2.5}类别不平衡与损失函数设计}{6}{subsection.2.5}%
 \contentsline {subsection}{\numberline {2.6}表格数据学习与特征表示理论}{7}{subsection.2.6}%
 \contentsline {subsection}{\numberline {2.7}临床风险评分与深度模型的互补关系}{7}{subsection.2.7}%
-\contentsline {subsection}{\numberline {2.8}评价指标基础}{7}{subsection.2.8}%
+\contentsline {subsection}{\numberline {2.8}评价指标基础}{8}{subsection.2.8}%
 \contentsline {subsection}{\numberline {2.9}本章小结}{8}{subsection.2.9}%
 \contentsline {section}{\numberline {3}模型设计}{9}{section.3}%
 \contentsline {subsection}{\numberline {3.1}系统总体架构}{9}{subsection.3.1}%
@@ -41,21 +41,21 @@
 \contentsline {subsubsection}{\numberline {4.1.2}评估指标}{13}{subsubsection.4.1.2}%
 \contentsline {subsection}{\numberline {4.2}动脉瘤分割实验结果}{13}{subsection.4.2}%
 \contentsline {subsubsection}{\numberline {4.2.1}训练与验证过程}{13}{subsubsection.4.2.1}%
-\contentsline {subsubsection}{\numberline {4.2.2}结果分析}{13}{subsubsection.4.2.2}%
-\contentsline {subsubsection}{\numberline {4.2.3}可视化与误差来源}{13}{subsubsection.4.2.3}%
+\contentsline {subsubsection}{\numberline {4.2.2}结果分析（基于真实评估报告）}{13}{subsubsection.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.2.3}可视化与误差来源}{14}{subsubsection.4.2.3}%
 \contentsline {subsection}{\numberline {4.3}破裂风险预测实验结果}{14}{subsection.4.3}%
 \contentsline {subsubsection}{\numberline {4.3.1}模型表现}{14}{subsubsection.4.3.1}%
 \contentsline {subsubsection}{\numberline {4.3.2}与传统基线对比}{14}{subsubsection.4.3.2}%
 \contentsline {subsection}{\numberline {4.4}系统联调与闭环验证}{14}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}本章小结}{14}{subsection.4.5}%
-\contentsline {section}{\numberline {5}总结与展望}{15}{section.5}%
-\contentsline {subsection}{\numberline {5.1}工作总结}{15}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}主要结论}{15}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}不足分析}{15}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}未来展望}{15}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}结束语}{16}{subsection.5.5}%
-\contentsline {section}{参考文献}{17}{subsection.5.5}%
-\contentsline {section}{附录A：关键配置与复现实验步骤}{19}{subsection.5.5}%
-\contentsline {section}{附录A：关键配置与复现实验步骤}{19}{subsection.5.5}%
-\contentsline {section}{致谢}{21}{Item.16}%
-\contentsline {section}{原创性声明和使用授权书}{22}{Item.16}%
+\contentsline {subsection}{\numberline {4.5}本章小结}{15}{subsection.4.5}%
+\contentsline {section}{\numberline {5}总结与展望}{16}{section.5}%
+\contentsline {subsection}{\numberline {5.1}工作总结}{16}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}主要结论}{16}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}不足分析}{16}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}未来展望}{16}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}结束语}{17}{subsection.5.5}%
+\contentsline {section}{参考文献}{18}{subsection.5.5}%
+\contentsline {section}{附录A：关键配置与复现实验步骤}{21}{subsection.5.5}%
+\contentsline {section}{附录A：关键配置与复现实验步骤}{21}{subsection.5.5}%
+\contentsline {section}{致谢}{23}{Item.16}%
+\contentsline {section}{原创性声明和使用授权书}{24}{Item.16}%

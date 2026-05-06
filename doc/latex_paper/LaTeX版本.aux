@@ -30,6 +30,7 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.4}课题来源与研究内容}{3}{subsection.1.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.5}论文结构安排}{3}{subsection.1.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.6}本章小结}{3}{subsection.1.6}\protected@file@percent }
+\citation{litjens2017survey,shen2017deep,maier2019learning}
 \@writefile{toc}{\contentsline {section}{\numberline {2}相关理论基础}{5}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}脑动脉瘤及分割基本原理}{5}{subsection.2.1}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {2{}.1}{\ignorespaces 实际脑动脉瘤CTA影像示例}}{5}{figure.caption.3}\protected@file@percent }
@@ -38,20 +39,25 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}医学图像分割基本理论}{5}{subsection.2.2}\protected@file@percent }
 \citation{long2015}
 \citation{unet}
-\citation{unet3d}
+\citation{unet3d,cciccek20163d}
+\citation{milletari2016,zhou2018unetpp,nnunet}
 \citation{attention_unet}
+\citation{sudre2017generaliseddice,salehi2017tversky,lin2017focal}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}卷积神经网络与 U-Net 结构}{6}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}注意力机制与 Attention U-Net}{6}{subsection.2.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5}类别不平衡与损失函数设计}{6}{subsection.2.5}\protected@file@percent }
 \citation{tabtransformer2020,fttransformer2021}
+\citation{breiman2001rf,chen2016xgboost,hastie2009elements}
 \citation{greving2014}
 \citation{backes2017}
 \citation{morita2012,thompson2015}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.6}表格数据学习与特征表示理论}{7}{subsection.2.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.7}临床风险评分与深度模型的互补关系}{7}{subsection.2.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.8}评价指标基础}{7}{subsection.2.8}\protected@file@percent }
+\citation{saito2015pr,guo2017calibration,niculescumizil2005calibration,chicco2020f1}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.8}评价指标基础}{8}{subsection.2.8}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.9}本章小结}{8}{subsection.2.9}\protected@file@percent }
 \citation{long2015,unet}
+\citation{sudre2017generaliseddice,salehi2017tversky,lin2017focal}
 \citation{attention_unet}
 \@writefile{toc}{\contentsline {section}{\numberline {3}模型设计}{9}{section.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}系统总体架构}{9}{subsection.3.1}\protected@file@percent }
@@ -62,6 +68,7 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.1}数据组织与流式补丁采样}{10}{subsubsection.3.3.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.2}网络结构与输出层}{10}{subsubsection.3.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.3}损失函数与优化策略}{10}{subsubsection.3.3.3}\protected@file@percent }
+\citation{tabtransformer2020,fttransformer2021,vaswani2017}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.4}检查点与整例推理重建}{11}{subsubsection.3.3.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}破裂风险预测模块设计}{11}{subsection.3.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}表格数据构建与预处理}{11}{subsubsection.3.4.1}\protected@file@percent }
@@ -75,19 +82,19 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.2}评估指标}{13}{subsubsection.4.1.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}动脉瘤分割实验结果}{13}{subsection.4.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.1}训练与验证过程}{13}{subsubsection.4.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.2}结果分析}{13}{subsubsection.4.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.3}可视化与误差来源}{13}{subsubsection.4.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.2}结果分析（基于真实评估报告）}{13}{subsubsection.4.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.2.3}可视化与误差来源}{14}{subsubsection.4.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}破裂风险预测实验结果}{14}{subsection.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}模型表现}{14}{subsubsection.4.3.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}与传统基线对比}{14}{subsubsection.4.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4}系统联调与闭环验证}{14}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}本章小结}{14}{subsection.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}总结与展望}{15}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}工作总结}{15}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}主要结论}{15}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}不足分析}{15}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}未来展望}{15}{subsection.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}结束语}{16}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}本章小结}{15}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}总结与展望}{16}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}工作总结}{16}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}主要结论}{16}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}不足分析}{16}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}未来展望}{16}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}结束语}{17}{subsection.5.5}\protected@file@percent }
 \bibstyle{gbt7714-numerical_new}
 \bibdata{ref/refs}
 \bibcite{chen2021}{{1}{2021}{{Chen et~al.}}{{Chen, Xu, Zhao, et~al.}}}
@@ -104,13 +111,28 @@
 \bibcite{nnunet}{{12}{2021}{{Isensee et~al.}}{{Isensee, Jaeger, Kohl, et~al.}}}
 \bibcite{kamnitsas2017}{{13}{2017}{{Kamnitsas et~al.}}{{Kamnitsas, Ledig, Newcombe, et~al.}}}
 \bibcite{strokenet}{{14}{2022}{{Chen et~al.}}{{Chen, Zhuang, Shen, et~al.}}}
-\@writefile{toc}{\contentsline {section}{参考文献}{17}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{参考文献}{18}{subsection.5.5}\protected@file@percent }
 \bibcite{xiong2025}{{15}{2025}{{Xiong et~al.}}{{Xiong, Wang, Chen, et~al.}}}
 \bibcite{tabtransformer2020}{{16}{2020}{{Huang et~al.}}{{Huang, Khetan, Cvitkovic, and Karnin}}}
 \bibcite{fttransformer2021}{{17}{2021}{{Gorishniy et~al.}}{{Gorishniy, Rubachev, Khrulkov, and Babenko}}}
 \bibcite{vaswani2017}{{18}{2017}{{Vaswani et~al.}}{{Vaswani, Shazeer, Parmar, et~al.}}}
-\@writefile{toc}{\contentsline {section}{附录A：关键配置与复现实验步骤}{19}{subsection.5.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{附录A：关键配置与复现实验步骤}{19}{subsection.5.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{致谢}{21}{Item.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{原创性声明和使用授权书}{22}{Item.16}\protected@file@percent }
-\gdef \@abspage@last{29}
+\bibcite{litjens2017survey}{{19}{2017}{{Litjens et~al.}}{{Litjens, Kooi, Bejnordi, et~al.}}}
+\bibcite{shen2017deep}{{20}{2017}{{Shen et~al.}}{{Shen, Wu, and Suk}}}
+\bibcite{maier2019learning}{{21}{2019}{{Maier et~al.}}{{Maier, Syben, Lasser, and Riess}}}
+\bibcite{cciccek20163d}{{22}{2016}{{Cicek et~al.}}{{Cicek, Abdulkadir, Lienkamp, Brox, and Ronneberger}}}
+\bibcite{zhou2018unetpp}{{23}{2018}{{Zhou et~al.}}{{Zhou, Siddiquee, Tajbakhsh, and Liang}}}
+\bibcite{sudre2017generaliseddice}{{24}{2017}{{Sudre et~al.}}{{Sudre, Li, Vercauteren, Ourselin, and Cardoso}}}
+\bibcite{salehi2017tversky}{{25}{2017}{{Salehi et~al.}}{{Salehi, Erdogmus, and Gholipour}}}
+\bibcite{lin2017focal}{{26}{2017}{{Lin et~al.}}{{Lin, Goyal, Girshick, He, and Doll{\'a}r}}}
+\bibcite{breiman2001rf}{{27}{2001}{{Breiman}}{{}}}
+\bibcite{chen2016xgboost}{{28}{2016}{{Chen et~al.}}{{Chen and Guestrin}}}
+\bibcite{hastie2009elements}{{29}{2009}{{Hastie et~al.}}{{Hastie, Tibshirani, and Friedman}}}
+\bibcite{saito2015pr}{{30}{2015}{{Saito et~al.}}{{Saito and Rehmsmeier}}}
+\bibcite{guo2017calibration}{{31}{2017}{{Guo et~al.}}{{Guo, Pleiss, Sun, and Weinberger}}}
+\bibcite{niculescumizil2005calibration}{{32}{2005}{{Niculescu-Mizil et~al.}}{{Niculescu-Mizil and Caruana}}}
+\bibcite{chicco2020f1}{{33}{2020}{{Chicco et~al.}}{{Chicco and Jurman}}}
+\@writefile{toc}{\contentsline {section}{附录A：关键配置与复现实验步骤}{21}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{附录A：关键配置与复现实验步骤}{21}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{致谢}{23}{Item.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{原创性声明和使用授权书}{24}{Item.16}\protected@file@percent }
+\gdef \@abspage@last{31}
