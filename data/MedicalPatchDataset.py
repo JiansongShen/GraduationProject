@@ -48,13 +48,12 @@ class MedicalPatchDataset(TorchDataset):
         self.validate_geometry = bool(getattr(cfg, "validate_geometry", False))
         self.rng = random.Random(seed)
         self.resample = ResampleHelper(self.target_spacing)
+        self._validated_cases: set[tuple[str, str]] = set()
 
         self._validate_sampling_mode(self.patch_sampling_mode)
         self.cases = self._build_case_records(cfg.train_dirs)
         if not self.cases:
             raise ValueError("No valid image-label pairs found in train_dirs")
-        if self.validate_geometry:
-            self._validate_case_geometries()
 
     def _validate_sampling_mode(self, mode: str) -> None:
         valid = {"foreground_priority", "foreground_only", "sequential"}
@@ -102,29 +101,36 @@ class MedicalPatchDataset(TorchDataset):
             )
         return records
 
-    def _validate_case_geometries(self) -> None:
-        for case in self.cases:
-            image_itk = sitk.ReadImage(case.image_path)
-            label_itk = sitk.ReadImage(case.label_path)
-            image_geometry = (image_itk.GetSize(), image_itk.GetSpacing(), image_itk.GetOrigin(), image_itk.GetDirection())
-            label_geometry = (label_itk.GetSize(), label_itk.GetSpacing(), label_itk.GetOrigin(), label_itk.GetDirection())
-            if image_geometry != label_geometry:
-                raise ValueError(
-                    "Image/label geometry mismatch before preprocessing: "
-                    f"image={case.image_path} label={case.label_path} "
-                    f"image_geometry={image_geometry} label_geometry={label_geometry}"
-                )
+    def _validate_case_geometry(
+        self,
+        case: CaseRecord,
+        image_itk: sitk.Image,
+        label_itk: sitk.Image,
+        image_train: sitk.Image,
+        label_train: sitk.Image,
+    ) -> None:
+        cache_key = (case.image_path, case.label_path)
+        if cache_key in self._validated_cases:
+            return
 
-            image_train, _ = self.resample.to_train_space(image_itk, is_label=False)
-            label_train, _ = self.resample.to_train_space(label_itk, is_label=True)
-            train_geometry = (image_train.GetSize(), image_train.GetSpacing(), image_train.GetOrigin(), image_train.GetDirection())
-            label_train_geometry = (label_train.GetSize(), label_train.GetSpacing(), label_train.GetOrigin(), label_train.GetDirection())
-            if train_geometry != label_train_geometry:
-                raise ValueError(
-                    "Image/label geometry mismatch after resampling: "
-                    f"image={case.image_path} label={case.label_path} "
-                    f"image_geometry={train_geometry} label_geometry={label_train_geometry}"
-                )
+        image_geometry = (image_itk.GetSize(), image_itk.GetSpacing(), image_itk.GetOrigin(), image_itk.GetDirection())
+        label_geometry = (label_itk.GetSize(), label_itk.GetSpacing(), label_itk.GetOrigin(), label_itk.GetDirection())
+        if image_geometry != label_geometry:
+            raise ValueError(
+                "Image/label geometry mismatch before preprocessing: "
+                f"image={case.image_path} label={case.label_path} "
+                f"image_geometry={image_geometry} label_geometry={label_geometry}"
+            )
+
+        train_geometry = (image_train.GetSize(), image_train.GetSpacing(), image_train.GetOrigin(), image_train.GetDirection())
+        label_train_geometry = (label_train.GetSize(), label_train.GetSpacing(), label_train.GetOrigin(), label_train.GetDirection())
+        if train_geometry != label_train_geometry:
+            raise ValueError(
+                "Image/label geometry mismatch after resampling: "
+                f"image={case.image_path} label={case.label_path} "
+                f"image_geometry={train_geometry} label_geometry={label_train_geometry}"
+            )
+        self._validated_cases.add(cache_key)
 
     def _load_case(self, case: CaseRecord) -> tuple[np.ndarray, np.ndarray, ResampleMeta]:
         image_itk = sitk.ReadImage(case.image_path)
@@ -132,6 +138,8 @@ class MedicalPatchDataset(TorchDataset):
 
         image_train, meta = self.resample.to_train_space(image_itk, is_label=False)
         label_train, _ = self.resample.to_train_space(label_itk, is_label=True)
+        if self.validate_geometry:
+            self._validate_case_geometry(case, image_itk, label_itk, image_train, label_train)
 
         image_np = sitk.GetArrayFromImage(image_train).astype(np.float32)
         label_np = sitk.GetArrayFromImage(label_train).astype(np.int64)
