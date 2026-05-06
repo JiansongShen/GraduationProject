@@ -137,38 +137,35 @@ class ForegroundSampler(PatchSampler):
         label: Optional[np.ndarray],
         num_patches: int,
     ) -> list[tuple[int, int, int]]:
+        max_patches = max(1, int(num_patches))
         if label is None:
             logging.warning("No label provided, falling back to sequential")
-            return self.iter_grid_starts(image.shape)[:num_patches]
+            return self.iter_grid_starts(image.shape)[:max_patches]
 
-        fg_coords = np.argwhere(label > 0)
-        if fg_coords.size == 0:
-            logging.warning("No foreground voxels found, falling back to sequential")
-            return self.iter_grid_starts(image.shape)[:num_patches]
+        grid_starts = self.iter_grid_starts(image.shape)
+        fg_starts = [s for s in grid_starts if self.is_foreground_patch(label, s)]
+        if not fg_starts:
+            logging.warning("No foreground patches found, falling back to sequential")
+            return grid_starts[:max_patches]
+
+        bg_starts = [s for s in grid_starts if not self.is_foreground_patch(label, s)]
+        self.rng.shuffle(fg_starts)
+        self.rng.shuffle(bg_starts)
 
         selected: list[tuple[int, int, int]] = []
-        bg_starts = [s for s in self.iter_grid_starts(image.shape) if not self.is_foreground_patch(label, s)]
+        fg_cursor = 0
         bg_cursor = 0
-
-        max_fg_patches = max(1, num_patches - min(num_patches - 1, self.bg_per_fg))
-        for _ in range(min(max_fg_patches, len(fg_coords))):
-            idx = self.rng.randrange(len(fg_coords))
-            cz, cy, cx = (int(v) for v in fg_coords[idx])
-            start = self._foreground_center_to_start((cz, cy, cx), image.shape)
-            selected.append(start)
+        while len(selected) < max_patches and fg_cursor < len(fg_starts):
+            selected.append(fg_starts[fg_cursor])
+            fg_cursor += 1
 
             for _ in range(self.bg_per_fg):
-                if len(selected) >= num_patches or bg_cursor >= len(bg_starts):
+                if len(selected) >= max_patches or bg_cursor >= len(bg_starts):
                     break
                 selected.append(bg_starts[bg_cursor])
                 bg_cursor += 1
 
-        while len(selected) < num_patches:
-            idx = self.rng.randrange(len(fg_coords))
-            cz, cy, cx = (int(v) for v in fg_coords[idx])
-            selected.append(self._foreground_center_to_start((cz, cy, cx), image.shape))
-
-        return selected[:num_patches]
+        return selected[:max_patches]
 
     def _foreground_center_to_start(
         self,

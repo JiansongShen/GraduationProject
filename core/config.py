@@ -47,7 +47,7 @@ class DataConfig:
     eval_dirs: list[str] = field(default_factory=list)
     origin_suffix: str = "_origin.nii.gz"
     label_suffixes: list[str] = field(default_factory=lambda: ["_label.nii.gz"])
-    patches_per_volume: int = 64
+    patches_per_volume: int = 64  # Maximum patches sampled per volume.
     patch_sampling_mode: str = "foreground_priority"
     background_per_foreground: int = 2
     max_load: int = 1000

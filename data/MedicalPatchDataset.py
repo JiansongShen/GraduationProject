@@ -160,17 +160,18 @@ class MedicalPatchDataset(TorchDataset):
 
         mode = (sampling_mode or self.patch_sampling_mode).lower()
         self._validate_sampling_mode(mode)
-        ppv = int(patches_per_volume or self.patches_per_volume)
+        max_patches = int(patches_per_volume or self.patches_per_volume)
 
-        starts = self._sample_starts(image, label, mode, ppv)
+        starts = self._sample_starts(image, label, mode, max_patches)
         image_patches, label_patches = self._extract_patches(image, label, starts)
         foreground_voxels = float((label_patches > 0).sum().item())
         total_voxels = float(label_patches.numel())
         logging.info(
-            "Loaded patches | case=%s | mode=%s | patches=%d | foreground_ratio=%.8f",
+            "Loaded patches | case=%s | mode=%s | patches=%d | max_patches=%d | foreground_ratio=%.8f",
             Path(case.image_path).name,
             mode,
             int(label_patches.shape[0]),
+            max_patches,
             foreground_voxels / total_voxels if total_voxels > 0.0 else 0.0,
         )
         return image_patches, label_patches
