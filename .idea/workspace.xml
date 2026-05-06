@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="b6d86c24-f051-4fb3-bb99-92df58c09d10" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/host.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/host.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -14,7 +13,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="322" />
+    <option name="cachedIndexableFilesCount" value="453" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -195,11 +194,11 @@
       <method v="2" />
     </configuration>
     <list>
+      <item itemvalue="npm.dev" />
       <item itemvalue="Python.eval_split" />
       <item itemvalue="Python.pyradiomic_test" />
       <item itemvalue="Python.start_web" />
       <item itemvalue="Python.train_split" />
-      <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
       <list>
@@ -238,6 +237,7 @@
       <workItem from="1777707876624" duration="5299000" />
       <workItem from="1777722485868" duration="24746000" />
       <workItem from="1777928496458" duration="11779000" />
+      <workItem from="1778001618020" duration="1492000" />
     </task>
     <servers />
   </component>

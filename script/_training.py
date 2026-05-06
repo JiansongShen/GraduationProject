@@ -11,8 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+import numpy as np
 import torch
-from sklearn.metrics import roc_auc_score
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -112,29 +112,22 @@ def save_eval_report(
     return report_path
 
 
-def _safe_auc(prob: torch.Tensor, target: torch.Tensor) -> float:
-    y_true = target.detach().cpu().view(-1).numpy()
-    y_prob = prob.detach().cpu().view(-1).numpy()
-    if len(y_true) == 0:
-        return 0.5
-    if len(set(y_true.tolist())) < 2:
-        return 0.5
-    return float(roc_auc_score(y_true, y_prob))
-
-
-def _binary_classification_metrics(
+def _update_confusion_counts(
     prob: torch.Tensor,
     target: torch.Tensor,
     threshold: float = 0.5,
 ) -> dict[str, float]:
-    pred = (prob >= threshold).float()
-    target = target.float()
+    pred = (prob >= threshold)
+    target_bool = target >= 0.5
 
-    tp = float(((pred == 1) & (target == 1)).sum().item())
-    tn = float(((pred == 0) & (target == 0)).sum().item())
-    fp = float(((pred == 1) & (target == 0)).sum().item())
-    fn = float(((pred == 0) & (target == 1)).sum().item())
+    tp = float((pred & target_bool).sum().item())
+    tn = float((~pred & ~target_bool).sum().item())
+    fp = float((pred & ~target_bool).sum().item())
+    fn = float((~pred & target_bool).sum().item())
+    return {"tp": tp, "tn": tn, "fp": fp, "fn": fn}
 
+
+def _metrics_from_confusion_counts(tp: float, tn: float, fp: float, fn: float) -> dict[str, float]:
     total = tp + tn + fp + fn
     accuracy = (tp + tn) / total if total > 0 else 0.0
     precision = tp / (tp + fp + 1e-8)
@@ -142,7 +135,6 @@ def _binary_classification_metrics(
     specificity = tn / (tn + fp + 1e-8)
     f1 = 2.0 * precision * recall / (precision + recall + 1e-8)
     iou = tp / (tp + fp + fn + 1e-8)
-
     return {
         "accuracy": accuracy,
         "precision": precision,
@@ -155,6 +147,46 @@ def _binary_classification_metrics(
         "fp": fp,
         "fn": fn,
     }
+
+
+def _update_auc_histograms(
+    prob: torch.Tensor,
+    target: torch.Tensor,
+    pos_hist: np.ndarray,
+    neg_hist: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    prob_np = prob.detach().float().cpu().clamp(0.0, 1.0).view(-1).numpy()
+    target_np = (target.detach().float().cpu().view(-1).numpy() >= 0.5)
+    if prob_np.size == 0:
+        return pos_hist, neg_hist
+
+    num_bins = int(pos_hist.shape[0])
+    bin_indices = np.minimum((prob_np * num_bins).astype(np.int64), num_bins - 1)
+    pos_bins = bin_indices[target_np]
+    neg_bins = bin_indices[~target_np]
+    if pos_bins.size > 0:
+        np.add.at(pos_hist, pos_bins, 1.0)
+    if neg_bins.size > 0:
+        np.add.at(neg_hist, neg_bins, 1.0)
+    return pos_hist, neg_hist
+
+
+def _histogram_auc(pos_hist: np.ndarray, neg_hist: np.ndarray) -> float:
+    pos_total = float(pos_hist.sum())
+    neg_total = float(neg_hist.sum())
+    if pos_total <= 0.0 or neg_total <= 0.0:
+        return 0.5
+
+    auc_numerator = 0.0
+    neg_seen_lower = 0.0
+    for bin_idx in range(len(pos_hist)):
+        pos_count = float(pos_hist[bin_idx])
+        neg_count = float(neg_hist[bin_idx])
+        if pos_count > 0.0:
+            auc_numerator += pos_count * neg_seen_lower
+            auc_numerator += 0.5 * pos_count * neg_count
+        neg_seen_lower += neg_count
+    return auc_numerator / (pos_total * neg_total)
 
 
 def train_one_epoch(
@@ -223,8 +255,16 @@ def validate(
     num_batches = 0
     num_cases = 0
     num_patches_total = 0
-    all_probs: list[torch.Tensor] = []
-    all_targets: list[torch.Tensor] = []
+    tp = 0.0
+    tn = 0.0
+    fp = 0.0
+    fn = 0.0
+    threshold = 0.5
+    auc_bins = 1024
+    pos_hist = np.zeros(auc_bins, dtype=np.float64)
+    neg_hist = np.zeros(auc_bins, dtype=np.float64)
+    positive_voxel_count = 0.0
+    total_voxel_count = 0.0
     lk = loss_kwargs if loss_kwargs is not None else _default_loss_kwargs()
     smooth = float(lk.get("smooth", 1e-6))
 
@@ -252,31 +292,26 @@ def validate(
                 total_aux += float(aux_loss.item())
                 total_dice += dice.item()
                 num_batches += 1
-                all_probs.append(outputs.detach().float().cpu().view(-1))
-                all_targets.append(batch_labels.detach().float().cpu().view(-1))
+
+                detached_outputs = outputs.detach().float()
+                detached_labels = batch_labels.detach().float()
+                counts = _update_confusion_counts(detached_outputs, detached_labels, threshold=threshold)
+                tp += counts["tp"]
+                tn += counts["tn"]
+                fp += counts["fp"]
+                fn += counts["fn"]
+                pos_hist, neg_hist = _update_auc_histograms(detached_outputs, detached_labels, pos_hist, neg_hist)
+                positive_voxel_count += float((detached_labels >= 0.5).sum().item())
+                total_voxel_count += float(detached_labels.numel())
 
     avg_dice = total_dice / max(num_batches, 1)
     avg_loss = total_loss / max(num_batches, 1)
     avg_primary = total_primary / max(num_batches, 1)
     avg_aux = total_aux / max(num_batches, 1)
-    probs = torch.cat(all_probs, dim=0) if all_probs else torch.zeros(0)
-    targets = torch.cat(all_targets, dim=0) if all_targets else torch.zeros(0)
-    threshold = 0.5
-    voxel_auc = _safe_auc(probs, targets) if probs.numel() > 0 else 0.5
-    voxel_metrics = _binary_classification_metrics(probs, targets, threshold=threshold) if probs.numel() > 0 else {
-        "accuracy": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "specificity": 0.0,
-        "f1": 0.0,
-        "iou": 0.0,
-        "tp": 0.0,
-        "tn": 0.0,
-        "fp": 0.0,
-        "fn": 0.0,
-    }
-    pred_positive_ratio = float((probs >= threshold).float().mean().item()) if probs.numel() > 0 else 0.0
-    gt_positive_ratio = float(targets.float().mean().item()) if targets.numel() > 0 else 0.0
+    voxel_auc = _histogram_auc(pos_hist, neg_hist)
+    voxel_metrics = _metrics_from_confusion_counts(tp, tn, fp, fn)
+    pred_positive_ratio = (tp + fp) / total_voxel_count if total_voxel_count > 0.0 else 0.0
+    gt_positive_ratio = positive_voxel_count / total_voxel_count if total_voxel_count > 0.0 else 0.0
     writer.add_scalar("Loss/val", avg_loss, epoch)
     writer.add_scalar("Dice/val", avg_dice, epoch)
     writer.add_scalar("AUC/val_voxel", voxel_auc, epoch)
@@ -307,6 +342,8 @@ def validate(
             "segmentation": {
                 "mean_dice": avg_dice,
                 "voxel_auc": voxel_auc,
+                "voxel_auc_method": "histogram",
+                "voxel_auc_bins": auc_bins,
                 "voxel_f1": voxel_metrics["f1"],
                 "voxel_iou": voxel_metrics["iou"],
                 "voxel_accuracy": voxel_metrics["accuracy"],
