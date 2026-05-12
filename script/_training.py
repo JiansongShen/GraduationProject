@@ -61,29 +61,41 @@ def save_checkpoint(
     checkpoint_dir: Path,
     is_best: bool = False,
     filename: str = "checkpoint.pth",
+    scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
 ) -> None:
-    """Save model checkpoint with optional best model."""
+    """Save model checkpoint with latest/best copies for resumable training."""
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "metric": metric},
-        checkpoint_dir / filename,
-    )
-    logging.info("Saved checkpoint: %s", checkpoint_dir / filename)
+    payload = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "metric": metric,
+    }
+    if scheduler is not None:
+        payload["scheduler_state_dict"] = scheduler.state_dict()
+
+    torch.save(payload, checkpoint_dir / filename)
+    torch.save(payload, checkpoint_dir / "latest.pth")
+    logging.info("Saved checkpoint: %s and latest.pth", checkpoint_dir / filename)
     if is_best:
-        torch.save(
-            {"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "metric": metric},
-            checkpoint_dir / "best.pth",
-        )
+        torch.save(payload, checkpoint_dir / "best.pth")
         logging.info("Saved best model (metric=%.4f)", metric)
 
 
-def load_checkpoint(checkpoint_path: str, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None) -> tuple[int, float]:
-    """Load checkpoint and return epoch and metric."""
+def load_checkpoint(
+    checkpoint_path: str,
+    model: nn.Module,
+    optimizer: Optional[torch.optim.Optimizer] = None,
+    scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+) -> tuple[int, float]:
+    """Load checkpoint and return next epoch and best metric for resume training."""
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(checkpoint["model_state_dict"])
     if optimizer and "optimizer_state_dict" in checkpoint:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    return checkpoint["epoch"], checkpoint.get("metric", 0.0)
+    if scheduler and "scheduler_state_dict" in checkpoint:
+        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+    return int(checkpoint["epoch"]), float(checkpoint.get("metric", 0.0))
 
 
 def _default_loss_kwargs() -> dict[str, float | str]:
@@ -263,6 +275,8 @@ def validate(
     cfg: Config | None = None,
     report_dir: Path | None = None,
     is_best_so_far: bool = False,
+    sampling_mode: str = "sequential",
+    writer_prefix: str = "val",
 ) -> dict[str, Any]:
     """Run validation and return aggregate metrics, optionally persisting a JSON report."""
     model.eval()
@@ -292,8 +306,11 @@ def validate(
 
     with torch.no_grad():
         for sample_idx in range(len(dataset)):
-            images, labels = dataset.get_patches(sample_idx, sampling_mode="sequential")
+            images, labels = dataset.get_patches(sample_idx, sampling_mode=sampling_mode)
             if labels is None:
+                continue
+            if int(images.shape[0]) == 0:
+                logging.warning("Validation skipped empty patch set: case=%s mode=%s", sample_idx, sampling_mode)
                 continue
 
             num_cases += 1
@@ -356,11 +373,11 @@ def validate(
     best_threshold_metrics = threshold_metrics.get(best_threshold_key, voxel_metrics)
     pred_positive_ratio = (tp + fp) / total_voxel_count if total_voxel_count > 0.0 else 0.0
     gt_positive_ratio = positive_voxel_count / total_voxel_count if total_voxel_count > 0.0 else 0.0
-    writer.add_scalar("Loss/val", avg_loss, epoch)
-    writer.add_scalar("Dice/val", avg_dice, epoch)
-    writer.add_scalar("AUC/val_voxel", voxel_auc, epoch)
-    writer.add_scalar("F1/val_voxel", voxel_metrics["f1"], epoch)
-    writer.add_scalar("F1/val_voxel_best_threshold", best_threshold_metrics["f1"], epoch)
+    writer.add_scalar(f"Loss/{writer_prefix}", avg_loss, epoch)
+    writer.add_scalar(f"Dice/{writer_prefix}", avg_dice, epoch)
+    writer.add_scalar(f"AUC/{writer_prefix}_voxel", voxel_auc, epoch)
+    writer.add_scalar(f"F1/{writer_prefix}_voxel", voxel_metrics["f1"], epoch)
+    writer.add_scalar(f"F1/{writer_prefix}_voxel_best_threshold", best_threshold_metrics["f1"], epoch)
     logging.info(
         "Validation - Loss: %.4f, Dice: %.4f, AUC: %.4f, F1@0.50: %.4f, BestF1: %.4f@thr=%.2f, Recall@best: %.4f, PredPos@best: %.6f",
         avg_loss,
@@ -416,6 +433,7 @@ def validate(
             },
             "threshold_sweep": threshold_metrics,
             "sampling": {
+                "mode": sampling_mode,
                 "num_cases": num_cases,
                 "num_batches": num_batches,
                 "num_patches_total": num_patches_total,
@@ -456,6 +474,7 @@ def validate(
 
     report["dataset_summary"] = {
         "num_eval_cases": num_cases,
+        "eval_sampling_mode": sampling_mode,
         "patch_sampling_mode": dataset.patch_sampling_mode,
         "patches_per_volume": dataset.patches_per_volume,
         "target_spacing": list(dataset.target_spacing),

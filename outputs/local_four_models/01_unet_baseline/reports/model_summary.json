@@ -1,0 +1,21 @@
+{
+  "experiment_key": "01_unet_baseline",
+  "display_name": "3D U-Net baseline",
+  "description": "基础 3D U-Net，作为医学图像分割基线模型。",
+  "use_aspp": false,
+  "use_coord_attention": false,
+  "parameter_count": 1366279,
+  "train_cases": 40,
+  "eval_cases": 1,
+  "epochs": 5,
+  "last_train_loss": 1.222644342825963,
+  "best_sequential_mean_dice": 1.601992231426817e-06,
+  "latest_sequential_mean_dice": 1.2242914450289023e-06,
+  "latest_sequential_voxel_auc": 0.7584319929150846,
+  "latest_sequential_best_f1": 1.591667565369362e-06,
+  "latest_foreground_only_mean_dice": 0.006060242652893066,
+  "checkpoint_latest": "outputs/local_four_models/01_unet_baseline/checkpoints/latest.pth",
+  "checkpoint_best": "outputs/local_four_models/01_unet_baseline/checkpoints/best.pth",
+  "log_dir": "outputs/local_four_models/01_unet_baseline/logs",
+  "report_dir": "outputs/local_four_models/01_unet_baseline/reports/eval_reports/2026-05-12/run_18-07-22"
+}

@@ -170,8 +170,8 @@ def main() -> None:
 
     start_epoch, best_dice = 0, 0.0
     if args.resume:
-        start_epoch, best_dice = load_checkpoint(args.resume, model, optimizer)
-        logging.info("Resuming from epoch %d", start_epoch)
+        start_epoch, best_dice = load_checkpoint(args.resume, model, optimizer, scheduler)
+        logging.info("Resuming from epoch %d with best metric %.4f", start_epoch, best_dice)
 
     logging.info(
         "Starting training for %d epochs... eval_every_n_epochs=%d save_interval=%d",
@@ -211,7 +211,7 @@ def main() -> None:
                 epoch + 1,
                 cfg.eval_every_n_epochs,
             )
-            eval_report = validate(
+            sequential_report = validate(
                 model,
                 val_dataset,
                 device,
@@ -220,17 +220,33 @@ def main() -> None:
                 batch_size=cfg.train.batch_size,
                 loss_kwargs=cfg.train.segmentation_loss_kwargs(),
                 cfg=cfg,
+                sampling_mode="sequential",
+                writer_prefix="val/sequential",
             )
-            val_dice = float(eval_report["metrics"]["segmentation"]["mean_dice"])
+            foreground_report = validate(
+                model,
+                val_dataset,
+                device,
+                epoch,
+                writer,
+                batch_size=cfg.train.batch_size,
+                loss_kwargs=cfg.train.segmentation_loss_kwargs(),
+                cfg=cfg,
+                sampling_mode="foreground_only",
+                writer_prefix="val/foreground_only",
+            )
+            val_dice = float(sequential_report["metrics"]["segmentation"]["mean_dice"])
             is_best = val_dice > best_dice
             if is_best:
                 best_dice = val_dice
-                eval_report["meta"]["is_best_so_far"] = True
-            save_eval_report(report_dir=eval_report_dir, epoch=epoch, report=eval_report)
-            save_checkpoint(model, optimizer, epoch + 1, val_dice, checkpoint_dir, is_best)
+                sequential_report["meta"]["is_best_so_far"] = True
+                foreground_report["meta"]["is_best_so_far"] = True
+            save_eval_report(report_dir=eval_report_dir / "sequential", epoch=epoch, report=sequential_report)
+            save_eval_report(report_dir=eval_report_dir / "foreground_only", epoch=epoch, report=foreground_report)
+            save_checkpoint(model, optimizer, epoch + 1, best_dice, checkpoint_dir, is_best, scheduler=scheduler)
 
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:
-            save_checkpoint(model, optimizer, epoch + 1, best_dice, checkpoint_dir, is_best=False)
+            save_checkpoint(model, optimizer, epoch + 1, best_dice, checkpoint_dir, is_best=False, scheduler=scheduler)
 
     logging.info("Training completed! Best Dice: %.4f", best_dice)
     writer.close()

@@ -1,0 +1,265 @@
+{
+  "meta": {
+    "task": "segmentation_eval",
+    "model_name": "AttentionUnet",
+    "report_version": "1.0",
+    "generated_at": "2026-05-12T18:13:22",
+    "epoch": 2,
+    "is_best_so_far": false
+  },
+  "metrics": {
+    "loss": {
+      "mean_total": 1.41581392288208,
+      "mean_primary": 0.42550522089004517,
+      "mean_aux": 0.9903087019920349
+    },
+    "segmentation": {
+      "mean_dice": 0.0058748722076416016,
+      "voxel_auc": 0.8134861466562813,
+      "voxel_auc_method": "histogram",
+      "voxel_auc_bins": 1024,
+      "voxel_f1": 0.0,
+      "voxel_iou": 0.0,
+      "voxel_accuracy": 0.98095703125,
+      "voxel_precision": 0.0,
+      "voxel_recall": 0.0,
+      "voxel_specificity": 0.9835985312093425,
+      "threshold": 0.5,
+      "pred_positive_ratio": 0.016357421875,
+      "gt_positive_ratio": 0.002685546875,
+      "best_f1_threshold": 0.4,
+      "best_f1": 0.01550387515143325,
+      "best_f1_recall": 0.18181818165289254,
+      "best_f1_precision": 0.008097165991575013,
+      "best_f1_pred_positive_ratio": 0.060302734375
+    },
+    "confusion_matrix": {
+      "tp": 0.0,
+      "tn": 4018.0,
+      "fp": 67.0,
+      "fn": 11.0
+    },
+    "threshold_sweep": {
+      "0.05": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.05,
+        "pred_positive_ratio": 1.0
+      },
+      "0.10": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.1,
+        "pred_positive_ratio": 1.0
+      },
+      "0.20": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.2,
+        "pred_positive_ratio": 1.0
+      },
+      "0.30": {
+        "accuracy": 0.099853515625,
+        "precision": 0.0029745808545079107,
+        "recall": 0.999999999090909,
+        "specificity": 0.097429620562797,
+        "f1": 0.005931517870189766,
+        "iou": 0.0029745808545079107,
+        "tp": 11.0,
+        "tn": 398.0,
+        "fp": 3687.0,
+        "fn": 0.0,
+        "threshold": 0.3,
+        "pred_positive_ratio": 0.90283203125
+      },
+      "0.40": {
+        "accuracy": 0.93798828125,
+        "precision": 0.008097165991575013,
+        "recall": 0.18181818165289254,
+        "specificity": 0.9400244798018604,
+        "f1": 0.01550387515143325,
+        "iou": 0.007812499999694824,
+        "tp": 2.0,
+        "tn": 3840.0,
+        "fp": 245.0,
+        "fn": 9.0,
+        "threshold": 0.4,
+        "pred_positive_ratio": 0.060302734375
+      },
+      "0.50": {
+        "accuracy": 0.98095703125,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9835985312093425,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4018.0,
+        "fp": 67.0,
+        "fn": 11.0,
+        "threshold": 0.5,
+        "pred_positive_ratio": 0.016357421875
+      },
+      "0.60": {
+        "accuracy": 0.994384765625,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9970624234981712,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4073.0,
+        "fp": 12.0,
+        "fn": 11.0,
+        "threshold": 0.6,
+        "pred_positive_ratio": 0.0029296875
+      },
+      "0.70": {
+        "accuracy": 0.996826171875,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9995104039143219,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4083.0,
+        "fp": 2.0,
+        "fn": 11.0,
+        "threshold": 0.7,
+        "pred_positive_ratio": 0.00048828125
+      },
+      "0.80": {
+        "accuracy": 0.997314453125,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9999999999975521,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4085.0,
+        "fp": 0.0,
+        "fn": 11.0,
+        "threshold": 0.8,
+        "pred_positive_ratio": 0.0
+      },
+      "0.90": {
+        "accuracy": 0.997314453125,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9999999999975521,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4085.0,
+        "fp": 0.0,
+        "fn": 11.0,
+        "threshold": 0.9,
+        "pred_positive_ratio": 0.0
+      }
+    },
+    "sampling": {
+      "mode": "foreground_only",
+      "num_cases": 1,
+      "num_batches": 1,
+      "num_patches_total": 1
+    }
+  },
+  "config_snapshot": {
+    "device": "cuda",
+    "seed": 42,
+    "eval_every_n_epochs": 1,
+    "train": {
+      "batch_size": 1,
+      "epochs": 5,
+      "learning_rate": 0.0001,
+      "weight_decay": 1e-05,
+      "optimizer": "adamw",
+      "scheduler": "cosine",
+      "warmup_epochs": 5,
+      "loss": {
+        "loss_type": "tversky_bce",
+        "tversky_alpha": 0.3,
+        "tversky_beta": 0.7,
+        "focal_gamma": 1.3333333333333333,
+        "smooth": 1e-06
+      }
+    },
+    "inference": {
+      "patch_size": [
+        16,
+        16,
+        16
+      ],
+      "effective_size": [
+        16,
+        16,
+        16
+      ],
+      "batch_size": 4,
+      "use_amp": true
+    },
+    "data": {
+      "patch_sampling_mode": "sequential",
+      "patches_per_volume": 100000,
+      "target_spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "origin_suffix": "_origin.nii.gz",
+      "label_suffixes": [
+        "_label.nii.gz",
+        "_ias.nii.gz"
+      ],
+      "preprocess": {
+        "enabled": false
+      }
+    }
+  },
+  "dataset_summary": {
+    "num_eval_cases": 1,
+    "eval_sampling_mode": "foreground_only",
+    "patch_sampling_mode": "sequential",
+    "patches_per_volume": 100000,
+    "target_spacing": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "origin_suffix": "_origin.nii.gz",
+    "label_suffixes": [
+      "_label.nii.gz",
+      "_ias.nii.gz"
+    ],
+    "preprocess": {
+      "enabled": false
+    },
+    "eval_case_names": [
+      "S86080_origin.nii.gz"
+    ]
+  }
+}

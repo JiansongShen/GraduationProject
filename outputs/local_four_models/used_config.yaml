@@ -1,0 +1,68 @@
+# Local four-model segmentation experiment config.
+# 参考 config/host.yaml 的本机数据路径与轻量 patch 设置。
+# 运行：uv run python script/local_four_model_report.py --config config/local_four_models.yaml
+
+model:
+  name: "attention_unet_3d"
+  in_channels: 1
+  out_channels: 1
+  base_filters: 32
+  depth: 3
+  dropout: 0.1
+  norm_type: "instance"
+  activation: "leaky_relu"
+  use_coord_attention: true
+  coord_reduction: 16
+  use_aspp: true
+  aspp_dilations: [1, 2, 4, 6]
+
+train:
+  epochs: 5
+  batch_size: 1
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  patch_size: [16, 16, 16]
+  optimizer: "adamw"
+  scheduler: "cosine"
+  warmup_epochs: 5
+  loss_type: "tversky_bce"
+  tversky_alpha: 0.3
+  tversky_beta: 0.7
+  focal_gamma: 1.3333333333333333
+  loss_smooth: 1.0e-6
+
+data:
+  train_dirs:
+    - "/home/napbad/project/graduate_proj/core_model/dataset/SingleCrop"
+    # - "/home/napbad/project/graduate_proj/core_model/dataset/MultiCrop"
+  eval_dirs:
+    - "/home/napbad/project/graduate_proj/core_model/dataset/Single"
+    # - "/home/napbad/project/graduate_proj/core_model/dataset/Multi"
+  origin_suffix: "_origin.nii.gz"
+  label_suffixes:
+    - "_label.nii.gz"
+    - "_ias.nii.gz"
+  patches_per_volume: 4
+  patch_sampling_mode: "foreground_priority"
+  background_per_foreground: 2
+  max_load: 40
+  eval_max_load: 1
+  validate_geometry: false
+  preprocess:
+    enabled: false
+
+inference:
+  patch_size: [16, 16, 16]
+  effective_size: [16, 16, 16]
+  batch_size: 4
+  use_amp: true
+
+checkpoint:
+  save_dir: "outputs/local_four_models/_single/checkpoints"
+  save_best: true
+  save_interval: 10
+
+device: "cuda"
+seed: 42
+log_dir: "outputs/local_four_models/_single/logs"
+eval_every_n_epochs: 1

@@ -1,0 +1,265 @@
+{
+  "meta": {
+    "task": "segmentation_eval",
+    "model_name": "AttentionUnet",
+    "report_version": "1.0",
+    "generated_at": "2026-05-12T18:08:17",
+    "epoch": 1,
+    "is_best_so_far": true
+  },
+  "metrics": {
+    "loss": {
+      "mean_total": 1.423018217086792,
+      "mean_primary": 0.436102032661438,
+      "mean_aux": 0.9869162440299988
+    },
+    "segmentation": {
+      "mean_dice": 0.007929861545562744,
+      "voxel_auc": 0.9632691665739401,
+      "voxel_auc_method": "histogram",
+      "voxel_auc_bins": 1024,
+      "voxel_f1": 0.0991735520497234,
+      "voxel_iou": 0.0521739130389414,
+      "voxel_accuracy": 0.973388671875,
+      "voxel_precision": 0.05454545454049587,
+      "voxel_recall": 0.5454545449586776,
+      "voxel_specificity": 0.974541003669585,
+      "threshold": 0.5,
+      "pred_positive_ratio": 0.02685546875,
+      "gt_positive_ratio": 0.002685546875,
+      "best_f1_threshold": 0.5,
+      "best_f1": 0.0991735520497234,
+      "best_f1_recall": 0.5454545449586776,
+      "best_f1_precision": 0.05454545454049587,
+      "best_f1_pred_positive_ratio": 0.02685546875
+    },
+    "confusion_matrix": {
+      "tp": 6.0,
+      "tn": 3981.0,
+      "fp": 104.0,
+      "fn": 5.0
+    },
+    "threshold_sweep": {
+      "0.05": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.05,
+        "pred_positive_ratio": 1.0
+      },
+      "0.10": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.1,
+        "pred_positive_ratio": 1.0
+      },
+      "0.20": {
+        "accuracy": 0.002685546875,
+        "precision": 0.0026855468749934436,
+        "recall": 0.999999999090909,
+        "specificity": 0.0,
+        "f1": 0.005356708005961069,
+        "iou": 0.0026855468749934436,
+        "tp": 11.0,
+        "tn": 0.0,
+        "fp": 4085.0,
+        "fn": 0.0,
+        "threshold": 0.2,
+        "pred_positive_ratio": 1.0
+      },
+      "0.30": {
+        "accuracy": 0.0830078125,
+        "precision": 0.0029200955667562515,
+        "recall": 0.999999999090909,
+        "specificity": 0.08053855569135732,
+        "f1": 0.005823186813267361,
+        "iou": 0.0029200955667562515,
+        "tp": 11.0,
+        "tn": 329.0,
+        "fp": 3756.0,
+        "fn": 0.0,
+        "threshold": 0.3,
+        "pred_positive_ratio": 0.919677734375
+      },
+      "0.40": {
+        "accuracy": 0.9052734375,
+        "precision": 0.025188916875939826,
+        "recall": 0.9090909082644627,
+        "specificity": 0.9052631578925208,
+        "f1": 0.04901960731605633,
+        "iou": 0.025125628140072218,
+        "tp": 10.0,
+        "tn": 3698.0,
+        "fp": 387.0,
+        "fn": 1.0,
+        "threshold": 0.4,
+        "pred_positive_ratio": 0.096923828125
+      },
+      "0.50": {
+        "accuracy": 0.973388671875,
+        "precision": 0.05454545454049587,
+        "recall": 0.5454545449586776,
+        "specificity": 0.974541003669585,
+        "f1": 0.0991735520497234,
+        "iou": 0.0521739130389414,
+        "tp": 6.0,
+        "tn": 3981.0,
+        "fp": 104.0,
+        "fn": 5.0,
+        "threshold": 0.5,
+        "pred_positive_ratio": 0.02685546875
+      },
+      "0.60": {
+        "accuracy": 0.9892578125,
+        "precision": 0.05405405403944485,
+        "recall": 0.18181818165289254,
+        "specificity": 0.9914320685410247,
+        "f1": 0.08333332976562514,
+        "iou": 0.04347826086011342,
+        "tp": 2.0,
+        "tn": 4050.0,
+        "fp": 35.0,
+        "fn": 9.0,
+        "threshold": 0.6,
+        "pred_positive_ratio": 0.009033203125
+      },
+      "0.70": {
+        "accuracy": 0.99365234375,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.996328029373326,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4070.0,
+        "fp": 15.0,
+        "fn": 11.0,
+        "threshold": 0.7,
+        "pred_positive_ratio": 0.003662109375
+      },
+      "0.80": {
+        "accuracy": 0.997314453125,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9999999999975521,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4085.0,
+        "fp": 0.0,
+        "fn": 11.0,
+        "threshold": 0.8,
+        "pred_positive_ratio": 0.0
+      },
+      "0.90": {
+        "accuracy": 0.997314453125,
+        "precision": 0.0,
+        "recall": 0.0,
+        "specificity": 0.9999999999975521,
+        "f1": 0.0,
+        "iou": 0.0,
+        "tp": 0.0,
+        "tn": 4085.0,
+        "fp": 0.0,
+        "fn": 11.0,
+        "threshold": 0.9,
+        "pred_positive_ratio": 0.0
+      }
+    },
+    "sampling": {
+      "mode": "foreground_only",
+      "num_cases": 1,
+      "num_batches": 1,
+      "num_patches_total": 1
+    }
+  },
+  "config_snapshot": {
+    "device": "cuda",
+    "seed": 42,
+    "eval_every_n_epochs": 1,
+    "train": {
+      "batch_size": 1,
+      "epochs": 5,
+      "learning_rate": 0.0001,
+      "weight_decay": 1e-05,
+      "optimizer": "adamw",
+      "scheduler": "cosine",
+      "warmup_epochs": 5,
+      "loss": {
+        "loss_type": "tversky_bce",
+        "tversky_alpha": 0.3,
+        "tversky_beta": 0.7,
+        "focal_gamma": 1.3333333333333333,
+        "smooth": 1e-06
+      }
+    },
+    "inference": {
+      "patch_size": [
+        16,
+        16,
+        16
+      ],
+      "effective_size": [
+        16,
+        16,
+        16
+      ],
+      "batch_size": 4,
+      "use_amp": true
+    },
+    "data": {
+      "patch_sampling_mode": "sequential",
+      "patches_per_volume": 100000,
+      "target_spacing": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "origin_suffix": "_origin.nii.gz",
+      "label_suffixes": [
+        "_label.nii.gz",
+        "_ias.nii.gz"
+      ],
+      "preprocess": {
+        "enabled": false
+      }
+    }
+  },
+  "dataset_summary": {
+    "num_eval_cases": 1,
+    "eval_sampling_mode": "foreground_only",
+    "patch_sampling_mode": "sequential",
+    "patches_per_volume": 100000,
+    "target_spacing": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "origin_suffix": "_origin.nii.gz",
+    "label_suffixes": [
+      "_label.nii.gz",
+      "_ias.nii.gz"
+    ],
+    "preprocess": {
+      "enabled": false
+    },
+    "eval_case_names": [
+      "S86080_origin.nii.gz"
+    ]
+  }
+}
