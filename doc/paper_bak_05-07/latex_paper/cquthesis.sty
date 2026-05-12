@@ -1,0 +1,524 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{cquthesis}[2026/05/03 CQU undergraduate thesis template]
+
+\RequirePackage{xparse}
+\RequirePackage{fontspec}
+\RequirePackage{xeCJK}
+\RequirePackage{geometry}
+\RequirePackage{amsmath}
+\RequirePackage{array}
+\RequirePackage[font=small,labelsep=none,justification=centering]{caption}
+\RequirePackage{amssymb}
+\RequirePackage{tikz}
+\RequirePackage{amsthm}
+\RequirePackage{mathrsfs}
+\RequirePackage{dutchcal}
+\RequirePackage{color}
+\RequirePackage{graphicx}
+\RequirePackage{times}
+\RequirePackage{mathptmx}
+\RequirePackage{fancyhdr}
+\RequirePackage{booktabs}
+\RequirePackage{appendix}
+\RequirePackage{tocloft}
+\RequirePackage{titlesec}
+\RequirePackage{etoolbox}
+\RequirePackage[numbers,square,comma,super,sort&compress]{natbib}
+\RequirePackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=black
+}
+
+\makeatletter
+\if@twoside
+  \geometry{
+    a4paper,
+    ignoreall,
+    nomarginpar,
+    top=30mm,
+    bottom=25mm,
+    inner=25mm,
+    outer=25mm,
+    bindingoffset=10mm,
+    headheight=3.7mm,
+    headsep=10.3mm,
+    footskip=9.3mm
+  }
+\else
+  \geometry{
+    a4paper,
+    ignoreall,
+    nomarginpar,
+    top=30mm,
+    bottom=25mm,
+    left=25mm,
+    right=25mm,
+    bindingoffset=10mm,
+    headheight=3.7mm,
+    headsep=10.3mm,
+    footskip=9.3mm
+  }
+\fi
+\makeatother
+
+\numberwithin{equation}{section}
+\renewcommand\thesection{\arabic{section}}
+\allowdisplaybreaks[4]
+
+\setmainfont{Times New Roman}
+\setCJKmainfont{simsun.ttc}[Path=fonts/,AutoFakeSlant,AutoFakeBold]
+\setCJKsansfont{simhei.ttf}[Path=fonts/,AutoFakeSlant,AutoFakeBold]
+\setCJKmonofont{simsun.ttc}[Path=fonts/,AutoFakeSlant,AutoFakeBold]
+\setCJKfamilyfont{zhsong}{simsun.ttc}[Path=fonts/,AutoFakeSlant,AutoFakeBold]
+\setCJKfamilyfont{zhhei}{simhei.ttf}[Path=fonts/,AutoFakeSlant,AutoFakeBold]
+\newfontfamily\SimHeiLatin{simhei.ttf}[Path=fonts/]
+\newfontfamily\SimSunLatin{simsun.ttc}[Path=fonts/]
+\providecommand{\songti}{\CJKfamily{zhsong}}
+\providecommand{\heiti}{\CJKfamily{zhhei}}
+
+\renewcommand{\thefigure}{\thesection{}.\arabic{figure}}
+\renewcommand{\thetable}{\thesection{}.\arabic{table}}
+\captionsetup{font={small},labelsep=quad}
+
+\newcommand*{\circled}[1]{\lower.7ex\hbox{\tikz\draw (0pt, 0pt)%
+    circle (.5em) node {\makebox[1em][c]{\small #1}};}}
+
+\setlength{\bibsep}{0pt}
+\AtBeginEnvironment{thebibliography}{%
+  \setlength{\itemsep}{0pt}%
+  \setlength{\parsep}{0pt}%
+}
+
+\makeatletter
+\pretocmd{\NAT@bibsetnum}{%
+  \setlength{\topsep}{0pt}%
+  \setlength{\partopsep}{0pt}%
+}{}{}
+\renewcommand\NAT@citesuper[3]{\ifNAT@swa%
+\unskip\kern\p@\textsuperscript{\NAT@@open #1\NAT@@close}%
+\if*#3*\else\ (#3)\fi\else #1\fi\endgroup}
+\DeclareRobustCommand\inlinecite{\@inlinecite}
+\def\@inlinecite#1{\begingroup\let\@cite\NAT@citenum\citep{#1}\endgroup}
+\let\onlinecite\inlinecite
+\makeatother
+
+\newlength{\CQUline}
+\setlength{\CQUline}{20pt}
+\newcommand{\CQUbodyfont}{\songti\fontsize{12pt}{20pt}\selectfont}
+\ExplSyntaxOn
+\NewDocumentCommand{\CQUunderlinedSpaces}{m}
+  {\int_step_inline:nn {#1} {\underline{\hphantom{字}}\allowbreak}}
+\ExplSyntaxOff
+\renewcommand{\normalsize}{\CQUbodyfont}
+\normalsize
+\setlength{\parskip}{0bp}
+\raggedbottom
+
+\newif\ifCQUlayoutdebug
+\CQUlayoutdebugfalse
+\newcommand{\CQUlayoutdebugon}{\CQUlayoutdebugtrue}
+\newcommand{\CQUlayoutdebugoff}{\CQUlayoutdebugfalse}
+\newlength{\CQUdebugspacewidth}
+\newcommand{\CQUdebugspaces}{%
+  \begingroup
+  \heiti\fontsize{16pt}{20pt}\selectfont
+  \settowidth{\CQUdebugspacewidth}{\quad}%
+  \typeout{CQU-LAYOUT space quad=\the\CQUdebugspacewidth}%
+  \settowidth{\CQUdebugspacewidth}{\qquad}%
+  \typeout{CQU-LAYOUT space qquad=\the\CQUdebugspacewidth}%
+  \typeout{CQU-LAYOUT space ccwd=\the\ccwd two-ccwd=\the\dimexpr2\ccwd\relax}%
+  \endgroup
+}
+
+\newcommand{\CQUChineseHeadingSetup}{%
+  \titleformat{\section}{\SimHeiLatin\heiti\zihao{3}\centering}{\SimHeiLatin\heiti\zihao{3}\thesection}{0.5em}{}[]%
+  \titlespacing*{\section}{0pt}{0pt}{0pt}%
+  \titleformat{\subsection}{\SimHeiLatin\heiti\zihao{-3}}{\SimHeiLatin\heiti\zihao{-3}\thesubsection}{0.5em}{}[]%
+  \titlespacing*{\subsection}{0pt}{0pt}{0pt}%
+  \titleformat{\subsubsection}{\SimHeiLatin\heiti\zihao{4}}{\SimHeiLatin\heiti\zihao{4}\thesubsubsection}{0.5em}{}[]%
+  \titlespacing*{\subsubsection}{0pt}{0pt}{0pt}%
+}
+\newcommand{\CQUexactline}[2]{%
+  \par
+  \ifCQUlayoutdebug
+    \begingroup
+    \setbox0=\hbox to \textwidth{#1\rule[-8pt]{0pt}{20pt}#2}%
+    \typeout{CQU-LAYOUT exactline page=\thepage before-pagetotal=\the\pagetotal box-ht=\the\ht0 box-dp=\the\dp0 box-total=\the\dimexpr\ht0+\dp0\relax textwidth=\the\textwidth}%
+    \box0
+    \typeout{CQU-LAYOUT exactline page=\thepage after-pagetotal=\the\pagetotal}%
+    \endgroup
+  \else
+    \hbox to \textwidth{#1\rule[-8pt]{0pt}{20pt}#2}%
+  \fi
+}
+\newcommand{\CQUheadingblankline}{%
+  \par
+  \vspace{\CQUline}%
+}
+\newif\ifCQUtextbeforeheading
+\CQUtextbeforeheadingfalse
+\AddToHook{para/begin}{\global\CQUtextbeforeheadingtrue}
+\newcommand{\CQUmaybeheadinggap}{%
+  \ifCQUtextbeforeheading
+    \CQUheadingblankline
+  \fi
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUblankline}{%
+  \ifCQUlayoutdebug\typeout{CQU-LAYOUT blankline page=\thepage before-pagetotal=\the\pagetotal}\fi
+  {\parindent=0pt\centering\songti\fontsize{10.5pt}{15.6pt}\selectfont\ifCQUlayoutdebug\typeout{CQU-LAYOUT blankline-baselineskip=\the\baselineskip}\fi \mbox{}\par}%
+  \ifCQUlayoutdebug\typeout{CQU-LAYOUT blankline page=\thepage after-pagetotal=\the\pagetotal}\fi
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUbibblankline}{%
+  {\parindent=0pt\noindent\rule{0pt}{14.4pt}\par}%
+}
+\newcommand{\CQUsectionTitle}[1]{%
+  \refstepcounter{section}%
+  \addcontentsline{toc}{section}{\protect\numberline{\thesection}#1}%
+  \markboth{\thesection\hspace{0.5em}#1}{\thesection\hspace{0.5em}#1}%
+  \ifCQUlayoutdebug\typeout{CQU-LAYOUT heading=section number=\thesection title=\detokenize{#1} page=\thepage pagetotal=\the\pagetotal}\fi
+  \CQUexactline{\hfil}{\smash{{\SimHeiLatin\heiti\fontsize{16pt}{20pt}\selectfont\thesection\hspace{0.5em}#1}}\hfil}%
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUsubsection}[1]{%
+  \CQUmaybeheadinggap
+  \refstepcounter{subsection}%
+  \addcontentsline{toc}{subsection}{\protect\numberline{\thesubsection}#1}%
+  \ifCQUlayoutdebug\typeout{CQU-LAYOUT heading=subsection number=\thesubsection title=\detokenize{#1} page=\thepage pagetotal=\the\pagetotal}\fi
+  \CQUexactline{}{\smash{{\SimHeiLatin\heiti\fontsize{15pt}{20pt}\selectfont\thesubsection\hspace{0.5em}#1}}\hfil}%
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUsubsubsection}[1]{%
+  \CQUmaybeheadinggap
+  \refstepcounter{subsubsection}%
+  \addcontentsline{toc}{subsubsection}{\protect\numberline{\thesubsubsection}#1}%
+  \ifCQUlayoutdebug\typeout{CQU-LAYOUT heading=subsubsection number=\thesubsubsection title=\detokenize{#1} page=\thepage pagetotal=\the\pagetotal}\fi
+  \CQUexactline{}{\smash{{\SimHeiLatin\heiti\fontsize{14pt}{20pt}\selectfont\thesubsubsection\hspace{0.5em}#1}}\hfil}%
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUsection}[1]{%
+  \newpage
+  \CQUblankline
+  \CQUsectionTitle{#1}%
+  \CQUblankline
+  \global\CQUtextbeforeheadingfalse
+}
+\newcommand{\CQUEnglishSectionSetup}{%
+  \titleformat{\section}[block]{\centering\bfseries\fontspec{Times New Roman}\fontsize{16pt}{20pt}\selectfont}{\thesection}{1em}{}[]%
+}
+\CQUChineseHeadingSetup
+
+\newcommand{\CQUtoctitlefont}{\heiti\fontsize{16pt}{20pt}\selectfont}
+\newcommand{\CQUtocsecfont}{\SimHeiLatin\heiti\fontsize{14pt}{20pt}\selectfont}
+\newcommand{\CQUtocsubsecfont}{\SimHeiLatin\heiti\fontsize{10.5pt}{20pt}\selectfont}
+\newcommand{\CQUtocsubsubsecfont}{\SimSunLatin\songti\fontsize{10.5pt}{20pt}\selectfont}
+\newcommand{\CQUtocdotfont}{\fontspec{Times New Roman}\fontsize{14pt}{20pt}\selectfont}
+\newcommand{\CQUtocpagefont}{\fontspec{Times New Roman}\fontsize{10.5pt}{20pt}\selectfont}
+\newcommand{\CQUtocdots}{\CQUtocdotfont\cftdotfill{0}}
+\renewcommand{\cfttoctitlefont}{\hfill\CQUtoctitlefont}
+\renewcommand{\cftaftertoctitle}{\hfill}
+\renewcommand{\cftsecfont}{\CQUtocsecfont}
+\renewcommand{\cftsecpagefont}{\CQUtocpagefont}
+\renewcommand{\cftsubsecfont}{\CQUtocsubsecfont}
+\renewcommand{\cftsubsecpagefont}{\CQUtocpagefont}
+\renewcommand{\cftsubsubsecfont}{\CQUtocsubsubsecfont}
+\renewcommand{\cftsubsubsecpagefont}{\CQUtocpagefont}
+\renewcommand{\cftsecpresnum}{\CQUtocsecfont}
+\renewcommand{\cftsubsecpresnum}{\CQUtocsubsecfont}
+\renewcommand{\cftsubsubsecpresnum}{\CQUtocsubsubsecfont}
+\renewcommand{\cftsecleader}{\CQUtocdots}
+\renewcommand{\cftsubsecleader}{\CQUtocdots}
+\renewcommand{\cftsubsubsecleader}{\CQUtocdots}
+\setlength{\cftbeforetoctitleskip}{0pt}
+\setlength{\cftaftertoctitleskip}{20pt}
+\setlength{\cftbeforesecskip}{0pt}
+\setlength{\cftbeforesubsecskip}{0pt}
+\setlength{\cftbeforesubsubsecskip}{0pt}
+\newlength{\CQUtocspace}
+\settowidth{\CQUtocspace}{\CQUtocsubsecfont\ }
+\renewcommand{\cftsecaftersnum}{\ }
+\renewcommand{\cftsubsecaftersnum}{\ }
+\renewcommand{\cftsubsubsecaftersnum}{\ }
+\setlength{\cftsecindent}{0pt}
+\setlength{\cftsubsecindent}{2\CQUtocspace}
+\setlength{\cftsubsubsecindent}{4\CQUtocspace}
+\setlength{\cftsecnumwidth}{1.1em}
+\setlength{\cftsubsecnumwidth}{2.1em}
+\setlength{\cftsubsubsecnumwidth}{3.1em}
+\renewcommand{\headrulewidth}{0.75pt}
+
+\makeatletter
+\newcommand{\CQU@chinesetitle}{面向终端交互的代码智能体研究}
+\newcommand{\CQU@englishtitle}{Study on Calculation method of XXX}
+\newcommand{\CQU@student}{王建华}
+\newcommand{\CQU@studentid}{20XXXXXX}
+\newcommand{\CQU@advisor}{杨 XX}
+\newcommand{\CQU@assistantadvisor}{李 XX}
+\newcommand{\CQU@major}{}
+\newcommand{\CQU@college}{重庆大学XXXXXX学院}
+\newcommand{\CQU@date}{20XX年6月}
+\newcommand{\CQU@englishstudent}{WANG Jianhua}
+\newcommand{\CQU@englishadvisor}{Prof. YANG XX}
+\newcommand{\CQU@englishassistantadvisor}{Prof. LI XX}
+\newcommand{\CQU@englishmajor}{XXXXXX}
+\newcommand{\CQU@englishcollege}{XXXXXX}
+\newcommand{\CQU@englishdate}{June，20XX}
+\newcommand{\CQU@logo}{fig1.png}
+\pgfkeys{
+  /CQU/.is family, /CQU,
+  chinese-title/.store in=\CQU@chinesetitle,
+  english-title/.store in=\CQU@englishtitle,
+  student/.store in=\CQU@student,
+  student-id/.store in=\CQU@studentid,
+  advisor/.store in=\CQU@advisor,
+  assistant-advisor/.store in=\CQU@assistantadvisor,
+  major/.store in=\CQU@major,
+  college/.store in=\CQU@college,
+  date/.store in=\CQU@date,
+  english-student/.store in=\CQU@englishstudent,
+  english-advisor/.store in=\CQU@englishadvisor,
+  english-assistant-advisor/.store in=\CQU@englishassistantadvisor,
+  english-major/.store in=\CQU@englishmajor,
+  english-college/.store in=\CQU@englishcollege,
+  english-date/.store in=\CQU@englishdate,
+  logo/.store in=\CQU@logo
+}
+\newcommand{\CQUsetup}[1]{\pgfkeys{/CQU,#1}}
+
+\newcommand{\CQUthesisHeader}{重庆大学本科学生毕业论文（设计）}
+\newcommand{\CQUheaderfont}{\songti\zihao{-5}}
+\newcommand{\CQUcurrentHeader}{}
+\newcommand{\CQUapplyheaderstyle}{%
+  \fancyhf{}%
+  \if@twoside
+    \fancyhead[CE]{\CQUheaderfont\CQUthesisHeader}%
+    \fancyhead[CO]{\CQUheaderfont\CQUcurrentHeader}%
+  \else
+    \fancyhead[L]{\CQUheaderfont\CQUthesisHeader}%
+    \fancyhead[R]{\CQUheaderfont\CQUcurrentHeader}%
+  \fi
+  \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0.75pt}%
+  \renewcommand{\footrulewidth}{0pt}%
+}
+\newcommand{\CQUsetheader}[1]{%
+  \gdef\CQUcurrentHeader{#1}%
+  \CQUapplyheaderstyle
+}
+\makeatother
+
+\pagestyle{fancy}
+\CQUsetheader{}
+
+\makeatletter
+\newcommand{\CQUmakechinesecover}{%
+\thispagestyle{empty}%
+
+\begin{center}
+\heiti  \zihao{-2} 重庆大学本科学生毕业论文（设计）
+\end{center}
+~\\
+\begin{center}
+\heiti  \zihao{2} \CQU@chinesetitle
+\end{center}
+
+~\\
+\renewcommand{\headrulewidth}{0.75pt}
+\begin{figure}[htb]
+  \centering
+    \center{\includegraphics[width=5cm]{\CQU@logo}}
+\end{figure}
+
+~\\
+\begin{center}
+\begin{minipage}{8cm}
+\heiti\fontsize{16pt}{31.2pt}\selectfont
+学\qquad 生：\CQU@student\par
+学\qquad 号：\CQU@studentid\par
+指导教师：\CQU@advisor\par
+% 助理指导教师：\CQU@assistantadvisor\par
+专\qquad 业：\CQU@major\par
+\end{minipage}
+\end{center}
+
+{\heiti\fontsize{16pt}{31.2pt}\selectfont
+\noindent\mbox{}\par
+\noindent\mbox{}\par
+}
+\begin{center}
+\heiti \zihao{-2} {\CQU@college}\\
+\end{center}
+
+\vspace{12pt}
+\begin{center}
+\heiti \zihao{3} {\CQU@date}
+\end{center}%
+}
+
+\newcommand{\CQUmakeenglishcover}{%
+\newpage
+\thispagestyle{empty}
+\begin{center}
+\zihao{3}
+\textbf{Undergraduate Thesis (Design) of Chongqing University}
+\end{center}
+~\\
+\begin{center}
+\zihao{2}
+\textbf{\CQU@englishtitle}
+\end{center}
+
+~\\
+\renewcommand{\headrulewidth}{0.75pt}
+\begin{figure}[htb]
+  \centering
+    \center{\includegraphics[width=5cm]{\CQU@logo}}
+\end{figure}
+
+\begin{center}
+\bfseries\fontsize{16pt}{31.2pt}\selectfont
+By\par
+\CQU@englishstudent
+\end{center}
+
+\begin{center}
+\bfseries\fontsize{16pt}{31.2pt}\selectfont
+Supervised by\par
+\CQU@englishadvisor\par
+and\par
+\CQU@englishassistantadvisor
+\end{center}
+
+\begin{center}
+\bfseries\fontsize{18pt}{31.2pt}\selectfont
+\CQU@englishmajor\par
+\CQU@englishcollege\par
+Chongqing University\par
+{\bfseries\fontsize{16pt}{31.2pt}\selectfont \CQU@englishdate}
+\end{center}%
+}
+\makeatother
+
+\newcommand{\CQUmakecover}{%
+  \CQUmakechinesecover
+  \CQUmakeenglishcover
+}
+
+\newcommand{\CQUfrontmatter}{%
+  \newpage
+  \pagestyle{fancy}%
+  \pagenumbering{Roman}%
+}
+
+\NewDocumentEnvironment{CQUChineseAbstract}{m}{%
+  \pagestyle{fancy}%
+  \CQUsetheader{摘要}%
+  \thispagestyle{fancy}%
+  \addcontentsline{toc}{section}{摘要}%
+  \CQUblankline
+  \section*{摘\quad 要}
+  \CQUblankline
+}{%
+  \par
+  \noindent\mbox{}\par
+  \noindent\hspace*{2em}{\heiti \zihao{-4}关键词}：#1\\
+}
+
+\NewDocumentEnvironment{CQUEnglishAbstract}{m}{%
+  \newpage
+  \pagestyle{fancy}%
+  \CQUsetheader{ABSTRACT}%
+  \thispagestyle{fancy}%
+  \addcontentsline{toc}{section}{ABSTRACT}%
+  \CQUEnglishSectionSetup
+  \CQUblankline
+  \section*{ABSTRACT}
+  \CQUblankline
+}{%
+  \par
+  \noindent\mbox{}\par
+  \noindent\hspace*{2em}\textbf{Key words}: #1
+}
+
+\newcommand{\CQUtableofcontents}{%
+  \newpage
+  \pagestyle{fancy}%
+  \CQUsetheader{目录}%
+  \renewcommand\contentsname{{目\quad 录}}%
+  \tableofcontents
+  \thispagestyle{fancy}%
+}
+
+\newcommand{\CQUmainmatter}{%
+  \newpage
+  \CQUsetheader{\leftmark}%
+  \pagenumbering{arabic}%
+  \CQUChineseHeadingSetup
+}
+
+\newcommand{\CQUprintbibliography}{%
+  \newpage
+  \CQUsetheader{参考文献}%
+  \addcontentsline{toc}{section}{参考文献}%
+  \renewcommand\refname{参考文献}%
+  \renewcommand{\bibsection}{%
+    \CQUbibblankline
+    \CQUexactline{\hfil}{\smash{{\SimHeiLatin\heiti\fontsize{16pt}{20pt}\selectfont 参\hspace{0.5em}考\hspace{0.5em}文\hspace{0.5em}献}}\hfil}%
+    \par\vspace{20pt}%
+  }%
+  \begingroup
+  \songti\fontspec{Times New Roman}\fontsize{10.5pt}{20pt}\selectfont
+  \bibliographystyle{gbt7714-numerical_new}%
+  \bibliography{ref/refs}%
+  \endgroup
+}
+
+\newcommand{\CQUmakedeclaration}{%
+\newpage
+\thispagestyle{empty}
+
+\addcontentsline{toc}{section}{原创性声明和使用授权书}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+{\centering\heiti\fontsize{16pt}{20pt}\selectfont 原创性声明\par}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+\songti\fontsize{12pt}{20pt}\selectfont
+郑重声明：所呈交的论文（设计）《\CQUunderlinedSpaces{35}》，是本人在导师的指导下，独立进行研究取得的成果。除论文（设计）中已经标注引用的内容外，本论文（设计）不包含其他人或集体已经发表或撰写过的作品成果。对本文的研究做出贡献的个人和集体，均已在文中以明确方式标明。本人完全意识到本声明的法律后果，并承诺因本声明而产生的法律结果由本人承担。
+
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+\begingroup
+\songti\fontsize{12pt}{30pt}\selectfont
+\noindent 论文（设计）作者签名: \underline{\hspace{6em}}\par
+\noindent 日期：\underline{\hspace{6em}}\par
+\endgroup
+
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+{\centering\heiti\fontsize{16pt}{20pt}\selectfont 使用授权书\par}%
+{\songti\fontsize{12pt}{20pt}\selectfont\noindent\mbox{}\par}%
+\songti\fontsize{12pt}{20pt}\selectfont
+本论文（设计）作者完全了解学校有关保留、使用论文（设计）的规定，同意学校保留并向国家有关部门或机构送交论文（设计）复印件和电子版，允许论文（设计）被查阅和借阅。本人授权重庆大学将本论文（设计）的全部或部分内容编入有关数据库进行检索，可以采用影印、缩印或扫描等复制方式保存和汇编本论文（设计）。
+
+~\\
+\songti\fontsize{12pt}{20pt}\selectfont
+本论文（设计）属于：\par
+保\quad 密 $\Box$  \quad 在\underline{\qquad}年解密后适用本授权书\par
+不保密 $\Box$
+
+~\\
+~\\
+\begin{flushleft}
+\songti\zihao{-4}
+\begingroup
+\songti\fontsize{12pt}{30pt}\selectfont
+论文（设计）作者签名：\underline{\hspace{6em}}\hfill 指导教师签名：\underline{\hspace{6em}}\par
+日期：\underline{\hspace{6em}}\hfill 日期：\underline{\hspace{6em}}\par
+\endgroup
+\end{flushleft}%
+}

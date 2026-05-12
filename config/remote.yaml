@@ -11,16 +11,6 @@ model:
   norm_type: "instance"  # "batch", "instance", "group"
   activation: "relu"  # "relu", "leaky_relu", "gelu"
 
-# preset models
-# - unet_small:    base_filters=32, depth=3
-# - unet_base:     base_filters=64, depth=4
-# - unet_large:    base_filters=128, depth=5, dropout=0.1
-# - resunet_small: base_filters=32, depth=4, use_residual=true, dropout=0.1
-# - resunet_base:  base_filters=64, depth=5, use_residual=true, dropout=0.1
-# - resunet_large: base_filters=128, depth=6, use_residual=true, dropout=0.2
-# - attention_unet_base: base_filters=64, depth=4, use_residual=true, use_attention=true
-# - attention_unet_large: base_filters=128, depth=5, use_residual=true, use_attention=true
-
 train:
   epochs: 40
   batch_size: 1

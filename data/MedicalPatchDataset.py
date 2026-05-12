@@ -166,7 +166,7 @@ class MedicalPatchDataset(TorchDataset):
         image_patches, label_patches = self._extract_patches(image, label, starts)
         foreground_voxels = float((label_patches > 0).sum().item())
         total_voxels = float(label_patches.numel())
-        logging.info(
+        logging.debug(
             "Loaded patches | case=%s | mode=%s | patches=%d | max_patches=%d | foreground_ratio=%.8f",
             Path(case.image_path).name,
             mode,

@@ -1,131 +1,224 @@
-% \CQUsection{相关理论基础}
-
-% \CQUsubsection{动脉瘤以及分割基本原理}
-
-% 脑动脉瘤是指脑血管壁局部异常膨出，形成像气球一样的囊状或梭形结构。它最常发生在脑底部的Willis环（大脑主要动脉汇合处）及其分支上。在CTA图像中主要表现为，局部囊状突出：血管壁向外膨出的“气球样”或“浆果样”结构。
-% 瘤颈：动脉瘤与载瘤动脉连接的狭窄部位。
-
-% \begin{figure}[htbp]
-% 	\centering
-% 	\includegraphics[width=0.4\textwidth]{figure/aneurysm_case.png}
-% 	\caption{实际脑动脉瘤样例}
-% 	\label{fig:system_architecture}
-% \end{figure}
-
-% 从上述图片可见，在上红色箭头所指，可看到模糊血管轮廓，但在下箭头所指，可发现血管突然涨大，是典型的动脉瘤病灶标准。
-
-% \CQUsubsection{医学图像分割基本理论}
-% 医学图像分割的目标是在像素或体素层面对目标解剖结构进行精确定位，其本质是一个密集预测问题。与自然图像中的目标检测相比，CTA 体数据具有三维空间连续、前景占比极低、病灶形态差异显著等特点，因此模型不仅需要学习局部边缘与纹理，还要保持跨层空间一致性。对于颅内动脉瘤任务而言，分割结果既可作为病灶可视化依据，也可进一步支持体积、长径、形态不规则度等衍生指标的计算，从而成为后续风险评估的重要输入。
-
-% 在经典监督学习框架下，训练样本由输入图像 $X$ 与金标准标签 $Y$ 构成，模型学习从 $X$ 到 $Y$ 的映射函数 $f_{\theta}(X)$。由于医学图像标注成本高、类别分布不平衡、成像条件复杂，实际训练中往往需要在网络结构、损失函数与采样机制之间协同设计，以保证模型既具有表达能力，又能稳定收敛。
-
-% \CQUsubsection{卷积神经网络与 U-Net 结构}
-% 卷积神经网络（Convolutional Neural Network, CNN）通过局部感受野、权值共享和层级特征提取机制，在图像分析任务中取得了广泛应用。对于分割问题，FCN（Fully Convolutional Network）首先将分类网络推广到像素级预测，使网络能够直接生成密集输出图\cite{long2015}；而 U-Net 在此基础上引入对称的编码器—解码器结构及跳跃连接，使浅层细节信息与深层语义信息得以融合，显著提升了医学图像分割精度\cite{unet}。
-
-% 三维医学图像具有明显的层间连续性，因此三维卷积网络能够更自然地利用上下文信息。3D U-Net 将二维卷积替换为三维卷积与三维上采样，可同时建模切片内与切片间的空间关系\cite{unet3d}。然而，三维卷积也会带来更高的显存与计算开销，因此在实际工程实现中通常需要结合补丁采样、流式加载和混合精度等策略来控制资源消耗。
-
-% \CQUsubsection{注意力机制与 Attention U-Net}
-% 注意力机制的核心思想是让模型在大量候选特征中自适应地突出与当前任务更相关的部分。对于颅内动脉瘤分割任务，病灶体积小、背景血管复杂，若直接拼接所有跳跃连接特征，容易将大量与病灶无关的响应传递至解码器，增加误检风险。Attention U-Net 在跳跃连接处加入门控模块，对编码器特征进行筛选，使解码器更关注目标区域\cite{attention_unet}。
-
-% 从形式上看，注意力门控通过当前解码特征与同尺度编码特征的联合映射生成一张权重图，再对编码特征进行加权。该机制可以理解为一种空间相关性筛选：当某位置更可能属于动脉瘤或其邻近血管区域时，权重会相对提高；当某位置更可能是背景时，权重会被抑制。这样既有助于减少无关背景干扰，又保留了 U-Net 对局部边界细节的表达优势。
-
-% \CQUsubsection{类别不平衡与损失函数基础}
-% 在颅内动脉瘤任务中，目标体素通常只占整例 CTA 体积中的极小比例，属于典型的类别极不平衡问题。若仅使用标准交叉熵损失，模型很容易学到“全部预测为背景”这一平凡解，从而在总体准确率上表现较高，却难以真正检出病灶。因此，需要引入更关注前景重叠程度的区域型损失。
-
-% Dice 系数是衡量预测区域与真实区域重叠程度的常用指标，其对应的 Dice 损失能够直接优化前景区域的一致性。对于预测概率 $p_i$ 与标签 $g_i$，Dice 损失可写为：
-% \begin{equation}
-% \mathcal{L}_{Dice}=1-\frac{2\sum_i p_i g_i+\epsilon}{\sum_i p_i+\sum_i g_i+\epsilon},
-% \end{equation}
-% 其中 $\epsilon$ 为平滑项。交叉熵损失则从逐体素分类角度约束模型输出，强调概率预测的数值稳定性。将二者组合能够兼顾局部分类准确性与整体区域重叠度，这也是本文分割模块损失设计的理论基础。
-
-% 对于风险预测任务，破裂与未破裂样本往往同样存在比例失衡，因此二分类训练中需要通过正类加权、阈值搜索等方式提高模型对少数类的敏感性。相比固定阈值 0.5，基于验证集的阈值搜索能够在精确率与召回率之间取得更符合任务目标的平衡。
-
-% \CQUsubsection{表格学习与特征表示理论}
-% 除影像体数据外，临床信息、人口统计学特征与既往病史通常以结构化表格形式存在。传统表格学习方法如逻辑回归、支持向量机和随机森林在变量规模有限时具有一定优势，但在数值特征与类别特征混合、非线性交互显著的场景下，模型表达能力可能受到限制。
-
-% 近年来，深度表格学习开始借鉴自然语言处理中的 token 化思想：将每个数值字段、类别字段都映射为统一维度的隐向量，再利用注意力机制建模字段之间的交互关系。其优点在于：一方面避免了人工构造高阶交叉项，另一方面能够统一处理连续变量与离散变量，为多模态融合提供了更灵活的表示空间。本文风险模型即基于这一思想，将数值 token 与类别 token 送入交叉注意力模块，以学习临床变量之间的潜在关联。
-
-% \CQUsubsection{评价指标基础}
-% 分割与分类任务的评价重点不同。分割侧常用 Dice 系数、敏感度、特异度、Hausdorff 距离等指标，其中 Dice 强调重叠区域的一致性，适合评价前景区域的整体拟合程度。分类与风险预测侧则常用准确率、精确率、召回率、F1 值与 AUC。AUC 反映模型对正负样本排序能力的整体水平，而 F1 值综合考虑精确率与召回率，适合在类别不平衡场景下衡量模型的综合表现。
-
-% 需要指出的是，对于极度稀疏的医学分割任务，单独依赖总体准确率往往会产生误导，因为背景体素数量远大于前景体素数量。正因如此，本文在实验分析中同时报告 Dice、体素级 F1、多阈值统计与基于直方图近似的 voxel AUC，以尽可能全面地反映模型性能。
-
-% \CQUsubsection{本章小结}
-% 本章围绕本文后续方法设计所依赖的理论基础进行了概述，主要包括三维医学图像分割的基本问题、CNN 与 U-Net 结构、注意力门控机制、类别不平衡下的损失函数设计、表格特征表示与交叉注意力思想，以及分割和风险预测常用评价指标。上述理论共同构成了本文系统实现与实验分析的出发点，为下一章的模型设计与工程实现提供了方法依据。
-
-
-
-
 \CQUsection{相关理论基础}
 
 \CQUsubsection{脑动脉瘤及分割基本原理}
 
-脑动脉瘤是指脑血管壁局部异常膨出所形成的囊状或梭形结构，最常发生于脑底部的Willis环及其主要分支。在CTA图像中，脑动脉瘤的主要表现为血管壁的局部囊状突出，呈现为“气球样”或“浆果样”的异常膨出结构。
+脑动脉瘤是指脑血管壁局部异常膨出后形成的囊状或者梭形结构，常见发生位置为脑底部 Willis 环及其主要分支。CTA图像上脑动脉瘤一般会显示为血管壁局部的囊状突起，也就是“气球样”或者“浆果样”的异常膨出结构。
 
-其中，瘤颈（neck）是指动脉瘤与载瘤动脉之间的连接部位，其宽度和形态对治疗方案的选择具有重要意义。
+瘤颈即 neck，是指动脉瘤与载瘤动脉之间的连接部位，它的宽度以及形态对临床诊断和治疗方案的选择有着重要的意义。
 
 \begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.45\textwidth]{figure/aneurysm_case.png}
-	\caption{实际脑动脉瘤CTA影像示例}
-	\label{fig:aneurysm_case}
+    \centering
+    \includegraphics[width=0.45\textwidth]{figure/aneurysm_case.png}
+    \caption{实际脑动脉瘤CTA影像示例}
+    \label{fig:aneurysm_case}
 \end{figure}
 
-如图所示，红色箭头指示区域中，上方血管轮廓相对正常，而下方箭头所指位置可见血管突然异常膨大，呈现典型的脑动脉瘤病灶特征。
+如图\ref{fig:aneurysm_case}所示，红色箭头指示的区域上部血管轮廓较正常，下部箭头所指位置可以看见血管突然膨大，有典型的脑动脉瘤病灶表现。
+
+图像分割是指将图像划分为若干具有语义一致性的区域，并从中提取出感兴趣目标的过程。在医学影像分析中，分割是病灶量化、三维可视化与辅助诊断的基础。对于颅内动脉瘤的CTA图像而言，分割任务要求算法能够自动识别动脉瘤区域，并将其与载瘤血管、骨质及周围软组织逐像素区分开来。该任务面临的主要难点包括：动脉瘤本身体积小、形态多变，极易受骨伪影和血管分叉复杂结构的影响；目标与背景间的像素占比严重不平衡，易导致小目标漏检；瘤颈与载瘤动脉的界限模糊，使得边界精确勾画更加困难。
+
+传统的分割方法（如阈值法、区域生长法、水平集方法等）多依赖人工设计的图像特征，在面对动脉瘤形态多变、噪声干扰大的情况时鲁棒性不足。近年来，以U-Net为代表的深度学习分割网络通过编码器-解码器结构结合跳跃连接，能够端到端地学习多层次特征表示，在医学图像小目标分割中表现出显著优势，已成为动脉瘤分割的主流技术路线。本文正是在此基础上，通过引入注意力机制与多尺度上下文模块，进一步增强网络对动脉瘤及其周边结构的建模能力。
 
 \CQUsubsection{医学图像分割基本理论}
 
-医学图像分割旨在像素或体素层面实现对目标解剖结构的精确定位，本质上属于密集预测（dense prediction）任务。与自然图像分割不同，CTA体数据具有三维空间连续性、前景占比极低以及病灶形态变异大等特点。因此，模型不仅需要捕捉局部边缘与纹理信息，还必须维持跨层面的空间一致性。该研究范式已在医学影像深度学习综述中得到系统论证\cite{litjens2017survey,shen2017deep,maier2019learning}。
+医学图像分割是用像素或者体素来完成目标解剖结构的精确定位，属于密集预测即 dense prediction 任务。与自然图像分割不同的是，CTA 体数据有三维空间连续、前景占比很小、病灶形态差异大等特点。因此，模型不仅要对局部边缘和纹理信息进行捕捉，还要保证跨层面的空间一致性。该研究范式已经在医学影像深度学习综述中得到明确论证\cite{litjens2017survey,shen2017deep,maier2019learning}。
 
-对于颅内动脉瘤分割任务而言，精确的分割结果既能为临床提供直观的可视化依据，也可进一步计算瘤体体积、最大径、形态不规则度等量化指标，成为后续破裂风险评估的重要基础。
+从数学形式上看，三维医学图像分割可以表示成对每个体素位置 $u\in\Omega$ 的类别估计问题，其中 $\Omega \subset \mathbb{R}^3$ 是体数据空间的定义域。给定输入图像 $X \in \mathbb{R}^{H \times W \times D}$，模型要学习条件概率 $p(y_u=1\mid X)$，根据它来生成概率图 $P=\{p_u\}_{u\in\Omega}$。给定一个阈值 $\tau \in [0,1]$，二值分割结果就可以表示为：
 
-在经典监督学习框架下，训练样本由输入图像 $X$ 和金标准标签 $Y$ 构成，模型的目标是学习从 $X$ 到 $Y$ 的映射函数 $f_{\theta}(X)$。由于医学图像标注成本高、类别分布极度不平衡以及成像条件复杂，实际训练中需在网络结构、损失函数和采样策略上进行协同设计，以平衡模型的表达能力和训练稳定性。
+\begin{equation}
+    \hat{y}_u = \mathbb{I}(p_u \geq \tau) = 
+    \begin{cases}
+        1, & \text{if } p_u \geq \tau \\
+        0, & \text{otherwise}
+    \end{cases}
+    \label{eq:binary-segmentation}
+\end{equation}
+其中，$\hat{y}_u$ 表示体素 $u$ 的二值分割结果，$p_u$ 表示该体素属于前景的预测概率，$\tau$ 是用于二值化的阈值，$\mathbb{I}(\cdot)$ 为示性函数。分割模型应该输出有空间连续性的概率分布，在局部边界处也要保持足够的敏感性。对于动脉瘤分割任务，我们期望模型能够在最小化预测边界与真实边界之间的距离同时最大化区域重叠度。这种密集预测任务的优化目标可以形式化为：
+
+\begin{equation}
+    \theta^* = \arg\min_{\theta} \mathbb{E}_{(X,Y)\sim\mathcal{D}} \left[ \mathcal{L}(f_{\theta}(X), Y) \right]
+    \label{eq:segmentation-objective}
+\end{equation}
+其中，$\theta$ 表示模型参数，$\theta^*$ 为最优参数，$X$ 为输入图像，$Y$ 为真实标签，$\mathcal{D}$ 为训练数据分布，$\mathcal{L}$ 为损失函数，$f_{\theta}(X)$ 为模型对输入图像的预测结果。分割模型需要在局部纹理特征和全局上下文信息之间取得平衡，使风险预测模型能更准确地捕捉到病灶形态的细节。
+
+对于颅内动脉瘤分割任务来说，准确的分割结果可以给临床提供直观的可视化依据，还可以计算出瘤体体积、最大径、形态不规则度等量化指标，是后续破裂风险评估的重要基础。
+
+在经典的监督学习框架中，训练样本由输入图像X和金标准标签Y组成，模型的目标就是学习从X到Y的映射函数$f_{\theta}(X)$。由于医学图像标注成本高、类别分布极度不平衡、成像条件复杂，实际训练中需要在网络结构、损失函数、采样策略之间进行权衡，从而兼顾模型表达能力与训练稳定性。
 
 \CQUsubsection{卷积神经网络与 U-Net 结构}
 
-卷积神经网络（CNN）通过局部感受野、权值共享和层次化特征提取，在医学图像分析中得到广泛应用。对于分割任务，Fully Convolutional Network（FCN）首次将分类网络扩展至像素级预测，实现端到端的密集输出\cite{long2015}。U-Net则在此基础上引入对称的编码器—解码器结构和跳跃连接（skip connection），有效融合浅层细节信息与深层语义信息，显著提升了医学图像分割性能\cite{unet}。
+卷积神经网络即CNN，依靠局部感受野、权值共享以及层级特征提取的方式，可以较好地利用图像中层次化的特征。对于一个三维卷积操作，其输出特征可以表示为：
 
-鉴于三维医学图像具有较强的层间连续性，3D U-Net将二维卷积替换为三维卷积和三维上采样，能够同时建模切片内与切片间的空间上下文关系\cite{unet3d,cciccek20163d}。在后续工作中，V-Net、UNet++ 与 nnU-Net 分别从体素级残差建模、跳跃连接重设计和自动化配置等角度进一步提升了医学分割性能\cite{milletari2016,zhou2018unetpp,nnunet}。然而，三维卷积也带来了更高的计算和显存开销，因此实际应用中常采用补丁训练（patch-based training）、流式加载及混合精度训练等策略进行优化。
+\begin{equation}
+    F_{l+1}(x,y,z) = \sigma\left( \sum_{c=1}^{C_l} \sum_{i=-k}^{k} \sum_{j=-k}^{k} \sum_{m=-k}^{k} W_c(i,j,m) \cdot F_l(x+i, y+j, z+m) + b \right)
+    \label{eq:conv3d}
+\end{equation}
+其中，$F_l$ 和 $F_{l+1}$ 分别表示第 $l$ 层和第 $l+1$ 层的特征图，$(x,y,z)$ 是三维空间位置，$C_l$ 表示第 $l$ 层的通道数，$W_c(i,j,m)$ 为第 $c$ 个通道对应的三维卷积核权重，$k$ 为卷积核半径，$b$ 为偏置项，$\sigma$ 为非线性激活函数。
+
+对于分割任务，Fully Convolutional Network即FCN第一次把分类网络扩展到像素级预测，实现端到端的密集输出\cite{long2015}。U-Net在此基础上采用对称的编码器-解码器结构和跳跃连接即skip connection，使浅层细节信息和深层语义信息得到融合。编码器的每一层可以表示为：
+
+\begin{equation}
+    E_i = \text{DownSample}(\text{ConvBlock}(E_{i-1})), \quad i=1,2,\ldots,L
+    \label{eq:unet-encoder}
+\end{equation}
+其中，$E_i$ 表示第 $i$ 层编码器特征，$E_{i-1}$ 表示上一层输入特征，$\text{ConvBlock}(\cdot)$ 表示卷积块操作，$\text{DownSample}(\cdot)$ 表示下采样操作，$L$ 为编码器层数。解码器通过上采样和特征拼接恢复空间分辨率：
+
+\begin{equation}
+    D_i = \text{ConvBlock}(\text{UpSample}(D_{i+1}) \oplus E_{L-i}), \quad i=L-1,\ldots,0
+    \label{eq:unet-decoder}
+\end{equation}
+其中，$D_i$ 表示第 $i$ 层解码器特征，$D_{i+1}$ 表示下一层解码输入，$\text{UpSample}(\cdot)$ 表示上采样操作，$E_{L-i}$ 表示与当前尺度对应的编码器特征，$\oplus$ 表示通道维度上的拼接操作。这种结构大大地提高了医学图像分割的效果\cite{unet}。
+
+由于三维医学图像在层间有很强的连续性，3D U-Net把二维卷积替换成三维卷积和三维上采样，可以同时得到切片内部和切片之间空间上下文信息\cite{unet3d,cciccek20163d}。V-Net、UNet++、nnU-Net等后续出现的模型对体素级残差建模、跳跃连接设计、自动化配置等进行了改进，从而提高了医学图像分割性能\cite{milletari2016,zhou2018unetpp,nnunet}。但是三维卷积也会带来更大的计算量和内存占用，因此实际应用中会采用补丁训练(patch-based training)、流式加载(streaming loading)、混合精度训练(mixed precision training)等方式来减轻资源的压力。
 
 \CQUsubsection{注意力机制与 Attention U-Net}
 
-注意力机制的核心在于使模型能够自适应地聚焦于与当前任务最相关的特征区域。对于体积小、背景血管复杂的颅内动脉瘤分割任务，若直接拼接所有跳跃连接特征，易将大量无关背景响应传递至解码器，增加误分割风险。Attention U-Net在跳跃连接处引入注意力门控（Attention Gate）模块，对编码器特征进行筛选，使解码器更关注目标相关区域\cite{attention_unet}。
+注意力机制的核心就是使模型可以自动地把焦点放在与当前任务有关的区域上。Attention Gate模块的数学表达如下：给定编码器特征 $F^e \in \mathbb{R}^{C \times H \times W \times D}$ 和解码器特征 $F^d \in \mathbb{R}^{C \times H \times W \times D}$，首先通过线性变换将它们映射到相同的维度：
 
-从实现机制来看，注意力门控通过将解码器特征与同尺度编码器特征进行联合映射，生成空间权重图，再对编码器特征进行加权。这一过程可视为空间相关性筛选：当某位置更可能属于动脉瘤或邻近血管时，权重被提升；反之则被抑制。该机制在减少背景干扰的同时，较好地保留了U-Net对局部边界细节的敏感性。
+\begin{equation}
+    q = W_q F^d, \quad k = W_k F^e
+    \label{eq:attention-qk}
+\end{equation}
+其中，$q$ 和 $k$ 分别表示由解码器特征 $F^d$ 与编码器特征 $F^e$ 经过线性变换得到的查询和键表示，$W_q$ 与 $W_k$ 为可学习映射矩阵。然后计算注意力分数并生成空间权重图：
+
+\begin{equation}
+    \alpha = \sigma(\psi^T \cdot \text{ReLU}(W_q F^d + W_k F^e + b))
+    \label{eq:attention-alpha}
+\end{equation}
+其中，$\alpha$ 为注意力权重图，$\psi$ 为可学习的参数向量，$b$ 为偏置项，$\sigma$ 为 sigmoid 激活函数，$\text{ReLU}(\cdot)$ 为线性整流函数，且 $\alpha \in (0,1)$。最终的加权特征为：
+
+\begin{equation}
+    \tilde{F}^e = \alpha \odot F^e
+    \label{eq:attention-gated}
+\end{equation}
+其中，$\tilde{F}^e$ 表示经过注意力筛选后的编码器特征，$\alpha$ 为注意力权重图，$F^e$ 为原始编码器特征，$\odot$ 表示逐元素乘法。本质上完成的是空间特征的选择，即当某个位置更有可能是动脉瘤或者邻近血管的时候，该位置的权重就会被提高，而反之则被抑制。用这样一种方式，可以降低背景干扰，同时较好地保持了U-Net对于局部边界细节的敏感性\cite{attention_unet}。
 
 \CQUsubsection{类别不平衡与损失函数设计}
 
-颅内动脉瘤在CTA体数据中通常仅占极小比例，属于典型的极度类别不平衡问题。若仅采用标准交叉熵损失，模型容易陷入“全部预测为背景”的平凡解，导致整体准确率虚高而病灶检出能力不足。因此，需要引入侧重前景区域重叠的损失函数。
+颅内动脉瘤在CTA体数据中所占比例很小，一般不到0.1\%，而且空间分布不均。如果只用标准交叉熵损失，模型很容易陷入“全部预测为背景”的平凡解，造成整体准确率虚高，但是病灶检出能力差。因此需要引入一种以前景区域重叠程度为标准的损失函数。
 
-本项目当前实现并未直接采用 Dice+BCE 作为训练损失，而是在二元交叉熵（BCE）的基础上，根据配置选择 Tversky 损失或 Focal 损失作为形状/难例约束项\cite{sudre2017generaliseddice,salehi2017tversky,lin2017focal}。Tversky 损失可视为 Dice 损失在假阳性与假阴性惩罚权重上的推广，其定义如下：
+在损失函数设计上，一般会用二元交叉熵即BCE来作为基础：
 
 \begin{equation}
-\mathcal{L}_{\text{Tversky}} = 1 - \frac{TP + \epsilon}{TP + \alpha FP + \beta FN + \epsilon},
+    \mathcal{L}_{\text{BCE}} = -\frac{1}{N}\sum_{i=1}^{N} \left[ y_i \log(p_i) + (1-y_i)\log(1-p_i) \right]
+    \label{eq:bce}
 \end{equation}
+其中，$\mathcal{L}_{\text{BCE}}$ 表示二元交叉熵损失，$N$ 为样本或体素总数，$y_i$ 为第 $i$ 个样本的真实标签，$p_i$ 为对应预测概率。再加入区域重叠型损失或者难分割病例挖掘型损失\cite{sudre2017generaliseddice,salehi2017tversky,lin2017focal}。Dice系数定义为预测区域与真实区域的重叠度：
 
-其中 $TP$、$FP$、$FN$ 分别表示软预测意义下的真阳性、假阳性和假阴性，$\alpha$ 与 $\beta$ 控制两类错误的权重，$\epsilon$ 为平滑系数。配置默认采用 \texttt{tversky + bce}，即 $\mathcal{L}=\mathcal{L}_{BCE}+\mathcal{L}_{Tversky}$；若选择 \texttt{focal + bce}，则使用 Focal 项替代 Tversky 项，以强化难分类体素对梯度的贡献。验证阶段仍计算 Dice 系数作为主要分割重叠指标。
+\begin{equation}
+    \text{Dice} = \frac{2|P \cap G|}{|P| + |G|} = \frac{2\sum_{i} p_i g_i}{\sum_{i} p_i + \sum_{i} g_i + \epsilon}
+    \label{eq:dice}
+\end{equation}
+其中，$P$ 表示预测前景集合，$G$ 表示真实前景集合，$p_i$ 和 $g_i$ 分别表示第 $i$ 个体素的预测值和真实值，$\epsilon$ 为平滑项。对应的Dice损失为：
 
-对于后续的动脉瘤破裂风险预测任务，由于正负样本同样存在不平衡，通常需采用正类加权或基于验证集的阈值优化策略，以提升模型对少数类（破裂组）的敏感性。
+\begin{equation}
+    \mathcal{L}_{\text{Dice}} = 1 - \text{Dice}
+    \label{eq:dice-loss}
+\end{equation}
+其中，$\mathcal{L}_{\text{Dice}}$ 表示 Dice 损失，用于度量预测区域与真实区域的差异。Tversky 损失是 Dice 损失在假阳性与假阴性惩罚权重上的推广，在训练过程中对错误类型更加敏感，定义如下：
+
+\begin{equation}
+    \mathcal{L}_{\text{Tversky}} = 1 - \frac{TP + \epsilon}{TP + \alpha FP + \beta FN + \epsilon}
+    \label{eq:tversky}
+\end{equation}
+其中，$\mathcal{L}_{\text{Tversky}}$ 表示 Tversky 损失，$TP$、$FP$、$FN$ 分别表示软预测意义下的真阳性、假阳性和假阴性，$\alpha$、$\beta$ 为两类错误的权重系数，$\epsilon$ 为平滑系数防止除零，通常满足 $\alpha+\beta=1$。当 $\alpha=\beta=0.5$ 时，Tversky损失退化为Dice损失；当 $\alpha \neq \beta$ 时，可以对不同错误类型施加不同的惩罚。
+
+Focal 损失通过降低易分类样本的损失贡献，使优化过程更加关注难分类体素：
+
+\begin{equation}
+    \mathcal{L}_{\text{Focal}} = -\frac{1}{N}\sum_{i=1}^{N} \left[ y_i (1-p_i)^\gamma \log(p_i) + (1-y_i) p_i^\gamma \log(1-p_i) \right]
+    \label{eq:focal}
+\end{equation}
+其中，$\mathcal{L}_{\text{Focal}}$ 表示 Focal 损失，$\gamma \geq 0$ 为聚焦参数，$y_i$ 和 $p_i$ 分别表示第 $i$ 个样本的真实标签和预测概率，$N$ 为样本总数。$\gamma$ 用来控制难易样本的权重差异，当 $\gamma=0$ 时，Focal损失退化为标准交叉熵损失。
+
+在实际应用中，常采用组合损失函数如bce+tversky或者bce+focal以兼顾不同优化目标：
+
+\begin{equation}
+    \mathcal{L}_{\text{total}} = \lambda_1 \mathcal{L}_{\text{BCE}} + \lambda_2 \mathcal{L}_{\text{Tversky}} + \lambda_3 \mathcal{L}_{\text{Focal}}
+    \label{eq:total-loss}
+\end{equation}
+其中，$\mathcal{L}_{\text{total}}$ 表示组合损失，$\lambda_1$、$\lambda_2$、$\lambda_3$ 为各损失项的权重系数，分别对应二元交叉熵损失、Tversky 损失和 Focal 损失。上述损失函数从不同角度缓解前景稀疏问题，为后续分割模型训练目标设计提供理论依据。
+
+对于动脉瘤破裂风险预测任务来说，由于正负样本都存在着不平衡的情况，一般会使用正类加权或者基于验证集的阈值优化策略来提高模型对少数类即破裂组的敏感性。
 
 \CQUsubsection{表格数据学习与特征表示理论}
 
-除影像数据外，临床信息、人口统计学特征及既往病史等多以结构化表格形式存在。传统机器学习方法（如逻辑回归、随机森林）在特征维度较低时表现良好，但在高维混合特征（数值型+类别型）且存在复杂非线性交互时，表达能力受限。
+除了影像数据之外，临床信息、人口统计学特征、既往病史等一般会用结构化表格的方式存储。传统的机器学习方法，逻辑回归、随机森林等，在特征维度低的时候会有一定的优势，但是当遇到高维混合特征，即数值型和类别型特征同时存在时，模型的表达能力就会受到很大的限制。
 
-近年来，深度表格学习借鉴NLP中的Token化思想，将每个特征字段映射为统一维度的隐向量，再通过注意力机制建模字段间的交互关系。TabTransformer 利用上下文化嵌入增强类别变量表达，FT-Transformer 则进一步验证了对数值字段进行 token 化并使用 Transformer 编码的有效性\cite{tabtransformer2020,fttransformer2021}。该类方法无需人工构造高阶交叉特征，且能统一处理连续与离散变量，为多模态融合提供了灵活高效的特征表示空间。本文的风险预测模块即基于这一思路构建；同时，传统集成学习方法如随机森林和梯度提升树仍是小样本表格任务中的重要比较基线\cite{breiman2001rf,chen2016xgboost,hastie2009elements}。
+近些年来，深度表格学习开始借鉴 NLP 中的 Token 化思想，将每个特征字段映射为统一维度的隐向量。对于数值型特征 $x_i \in \mathbb{R}$，通过线性投影得到嵌入表示：
+
+\begin{equation}
+    h_i = W_i x_i + b_i, \quad h_i \in \mathbb{R}^d
+    \label{eq:numeric-embed}
+\end{equation}
+其中，$x_i$ 表示第 $i$ 个数值型特征，$W_i$ 和 $b_i$ 为可学习参数，$h_i$ 为映射到 $d$ 维空间后的嵌入表示。对于类别型特征，使用查找表嵌入：
+
+\begin{equation}
+    h_i = \text{Embedding}_i(x_i), \quad x_i \in \{1,2,\ldots,C_i\}
+    \label{eq:categorical-embed}
+\end{equation}
+其中，$x_i$ 表示第 $i$ 个类别型特征的离散取值，$C_i$ 表示该特征的类别总数，$\text{Embedding}_i(\cdot)$ 为查找表嵌入函数，$h_i$ 为对应的连续向量表示。所有特征的嵌入向量拼接后形成输入序列 $H = [h_1; h_2; \ldots; h_F] \in \mathbb{R}^{F \times d}$，再通过Transformer编码器进行上下文化：
+
+\begin{equation}
+    \text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d}}\right)V
+    \label{eq:attention}
+\end{equation}
+其中，$Q$、$K$、$V$ 分别表示查询、键和值矩阵，$d$ 为特征维度，$\text{softmax}(\cdot)$ 为归一化函数。该式描述了注意力权重对值向量的加权汇聚过程。
+
+\begin{equation}
+    H' = \text{LayerNorm}(H + \text{MultiHeadAttention}(H))
+    \label{eq:transformer1}
+\end{equation}
+其中，$H$ 表示输入特征序列，$H'$ 为经过多头注意力与残差连接后的表示，$\text{LayerNorm}(\cdot)$ 为层归一化操作，$\text{MultiHeadAttention}(\cdot)$ 为多头注意力模块。
+
+\begin{equation}
+    H'' = \text{LayerNorm}(H' + \text{MLP}(H'))
+    \label{eq:transformer2}
+\end{equation}
+其中，$H''$ 为经过前馈网络后的输出表示，$\text{MLP}(\cdot)$ 为多层感知机模块。TabTransformer 使用上下文化嵌入来增强类别变量的表达能力，FT-Transformer 则证明了对数值字段进行 token 化并且使用 Transformer 编码的有效性\cite{tabtransformer2020,fttransformer2021}。不需要人工创建高阶交叉特征，可以统一处理连续变量和离散变量，给多模态融合提供比较灵活的表示方式。
+
+本文风险预测模块就是按照这个思路来搭建的，同时研究中也保留了随机森林和梯度提升树等传统的集成学习方法，作为小样本表格数据上的重要对比基线\cite{breiman2001rf,chen2016xgboost,hastie2009elements}。
 
 \CQUsubsection{临床风险评分与深度模型的互补关系}
 
-未破裂颅内动脉瘤的管理并非单纯的图像分割问题。PHASES 评分综合人群来源、高血压、年龄、动脉瘤大小、既往蛛网膜下腔出血史和部位等因素，用于估计未来破裂风险\cite{greving2014}；ELAPSS 评分则将年龄、部位、大小、形态和既往蛛网膜下腔出血等因素纳入未破裂动脉瘤增长风险预测\cite{backes2017}。此外，大规模自然病程队列研究也提示，不同部位、不同直径和形态不规则程度的动脉瘤具有不同的破裂倾向\cite{morita2012,thompson2015}。
+未破裂颅内动脉瘤的管理不是单纯的图像分割问题。PHASES评分把人群来源、高血压、年龄、动脉瘤大小、既往蛛网膜下腔出血史、部位等作为影响因素来估计未来的破裂风险\cite{greving2014}。除此之外，大规模自然病程队列研究也表明，不同部位、不同直径、不同形态不规则程度的动脉瘤，具有不同的破裂倾向\cite{morita2012}。
 
-上述评分体系具有解释性强、使用门槛低的优点，但其变量项相对固定，难以充分吸收三维分割衍生出的体积、表面不规则度、瘤颈宽度、影像组学纹理等高维信息。深度学习模型则可在数据充分且划分严格的前提下学习非线性交互。因此，本文将风险预测定位为瘤体破裂概率估计：既参考经典风险因素，也通过表格注意力模型探索字段间潜在联系，并在实验章节强调验证集阈值搜索与数据泄漏防护。
+上述评分体系有解释性强、使用门槛低的优点，但是它的变量项比较固定，很难对三维分割衍生出的体积、表面不规则度、瘤颈宽度、影像组学纹理等高维信息进行充分的提取。深度学习模型可以很好地在数据充足、划分严格的情况下学习非线性交互。因此将注意力表示学习同传统的机器学习方法进行比较或者融合，可以同时考察非线性表征能力以及小样本稳健性，并为风险预测提供更加全面的方法学参照。
 
 \CQUsubsection{评价指标基础}
 
-分割任务常用Dice系数、敏感度（Sensitivity）、特异度（Specificity）、Hausdorff距离等指标，其中Dice系数重点衡量预测区域与真实区域的重叠程度。分类与风险预测任务则常用准确率、精确率、召回率、F1值以及AUC-ROC等指标。AUC反映模型整体排序能力，F1值则在不平衡场景下更能综合体现精确率与召回率的平衡。鉴于医学管理系统中，对病灶的漏诊远远严重于误诊，因此，本文选择使用召回率来进行模型的首要评判标准，兼用AUC进行模型性能评估。
+分割任务常用以下评价指标：
 
-针对极度稀疏的医学分割任务，单纯依赖总体准确率易产生误导。因此，本文在实验中同时报告Dice系数、体素级F1、多阈值统计结果及基于直方图近似的voxel-wise AUC，以实现对模型性能的全面评估；对于不平衡二分类场景，PR曲线与校准分析同样具有重要参考价值\cite{saito2015pr,guo2017calibration,niculescumizil2005calibration,chicco2020f1}。
+\textbf{Dice系数}衡量预测区域与真实区域的重叠程度：
+\begin{equation}
+    \text{Dice} = \frac{2|P \cap G|}{|P| + |G|}
+    \label{eq:dice-basic}
+\end{equation}
+其中，$P$ 表示预测前景集合，$G$ 表示真实前景集合，Dice 用于衡量二者的重叠程度。
+
+\textbf{敏感度(Sensitivity)}和\textbf{特异度(Specificity)}分别反映模型对正负样本的识别能力：
+\begin{equation}
+    \text{Sensitivity} = \frac{TP}{TP + FN}, \quad \text{Specificity} = \frac{TN}{TN + FP}
+    \label{eq:specificity-sensitivity}
+\end{equation}
+其中，$TP$、$TN$、$FP$、$FN$ 分别表示真阳性、真阴性、假阳性和假阴性。分类和风险预测任务一般会用到准确率、精确率、召回率、F1值和AUC-ROC等指标。精确率和召回率定义为：
+\begin{equation}
+    \text{Precision} = \frac{TP}{TP + FP}, \quad \text{Recall} = \frac{TP}{TP + FN}
+    \label{eq:precision-recall}
+\end{equation}
+其中，Precision 表示精确率，Recall 表示召回率，$TP$、$FP$、$FN$ 的含义同上。F1值为精确率和召回率的调和平均：
+\begin{equation}
+    F_1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+    \label{eq:f1}
+\end{equation}
+其中，$F_1$ 为精确率与召回率的调和平均值，用于综合衡量模型的查准率和查全率。AUC-ROC曲线下面积反映模型整体排序能力，计算公式为：
+\begin{equation}
+    \text{AUC} = \int_0^1 \text{TPR}(\tau) \, d(\text{FPR}(\tau))
+    \label{eq:auc}
+\end{equation}
+其中，$\text{AUC}$ 表示 ROC 曲线下面积，$\text{TPR}$ 为真阳性率，$\text{FPR}$ 为假阳性率，$\tau$ 为分类阈值。由于医学管理系统中病灶漏诊的代价大于误诊，本文以召回率为模型的重要评价指标，用AUC进行模型性能评价。
+
+对于极度稀疏的医学分割任务，仅依靠总体准确率容易产生误导。因此，在实验代码中同时给出Dice系数、体素级F1、多阈值统计结果以及基于直方图近似的voxel-wise AUC，从而对模型性能进行更加全面的评价；并且在不平衡二分类场景下，PR曲线和校准分析同样具有重要的参考价值\cite{saito2015pr,guo2017calibration,niculescumizil2005calibration,chicco2020f1}。
 
 \CQUsubsection{本章小结}
-
-本章系统概述了本文研究所需的核心理论基础，包括脑动脉瘤的影像学表现、三维医学图像分割基本问题、U-Net及其注意力变体、类别不平衡下的损失函数设计、表格数据深度表征方法，以及相关评价指标体系。这些理论为后续章节的模型设计、优化策略与实验分析提供了坚实的理论支撑。
-
+本章对本文研究所必须的理论基础进行了系统的概述，内容包括脑动脉瘤的影像学表现、三维医学图像分割基本问题、U-Net及其注意力变体、类别不平衡条件下损失函数的设计、表格数据深度表征方法、相关评价指标体系等。这些理论内容为后面章节的模型设计、优化策略、实验分析提供理论支持。

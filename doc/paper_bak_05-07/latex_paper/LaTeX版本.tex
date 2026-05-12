@@ -1,0 +1,64 @@
+\documentclass[UTF8,a4paper,12pt,fontset=none,linespread=1,oneside]{ctexart}
+\usepackage{cquthesis}
+\setlength{\headheight}{11pt}
+\graphicspath{{./}}
+
+\CQUsetup{
+  chinese-title = {基于深度学习的颅内动脉瘤检测与破裂风险预测系统},
+  english-title = {Deep Learning-Based Intracranial Aneurysm Detection and Rupture Risk Prediction System},
+  student = {申建松},
+  student-id = {20221556},
+  advisor = {文静},
+  assistant-advisor = {},
+  major = {计算机科学与技术},
+  college = {重庆大学计算机学院},
+  date = {2026年6月},
+  english-student = {SHEN Jiansong},
+  english-advisor = {Assoc.~Prof. WEN Jing},
+  english-assistant-advisor = {},
+  english-major = {Computer Science and Technology},
+  english-college = {College of Computer Science, Chongqing University},
+  english-date = {June, 2026},
+  logo = {fig1.PNG}
+}
+
+\begin{document}
+
+\CQUmakecover
+\CQUfrontmatter
+
+\begin{CQUChineseAbstract}{颅内动脉瘤；CTA；三维分割；Attention U-Net；表格学习；交叉注意力；破裂风险预测}
+\input{contents/abstract_cn}
+\end{CQUChineseAbstract}
+
+\begin{CQUEnglishAbstract}{intracranial aneurysm; CTA; 3D segmentation; Attention U-Net; tabular learning; cross-attention; rupture risk prediction}
+\input{contents/abstract_en}
+\end{CQUEnglishAbstract}
+
+\CQUtableofcontents
+\CQUmainmatter
+
+\input{contents/chapter1_intro}
+\input{contents/chapter2_theory}
+\input{contents/chapter3_method}
+\input{contents/chapter4_analysis}
+\input{contents/chapter5_conclusion}
+
+\CQUprintbibliography
+
+\newpage
+\CQUsetheader{附录A：关键配置与复现实验步骤}
+% \addcontentsline{toc}{section}{附录A：关键配置与复现实验步骤}
+\input{contents/appendix}
+
+\newpage
+\CQUsetheader{致谢}
+\addcontentsline{toc}{section}{致谢}
+\CQUblankline
+\section*{致\quad 谢}
+\CQUblankline
+\input{contents/ack}
+
+\CQUmakedeclaration
+
+\end{document}

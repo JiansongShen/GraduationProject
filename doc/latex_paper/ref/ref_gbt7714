@@ -1,0 +1,70 @@
+Li Y, Cui F, Xue X, et al. Coarse-to-fine salient object detection based on deep convolutional neural networks[J]. Signal Processing: Image Communication, 2018, 64: 21-32.
+
+Chen M, Geng C, Wang D, et al. A coarse-to-fine cascade deep learning neural network for segmenting cerebral aneurysms in time-of-flight magnetic resonance angiography[J]. Biomedical Engineering Online, 2022, 21(1): 71.
+
+Greving J P, Wermer M J H, Brown R D, et al. Development of the PHASES score for prediction of risk of rupture of intracranial aneurysms: a pooled analysis of six prospective cohort studies[J]. The Lancet Neurology, 2014, 13(1): 59-66.
+
+Backes D, Rinkel G J E, Greving J P, et al. ELAPSS score for prediction of risk of growth of unruptured intracranial aneurysms[J]. Neurology, 2017, 88(17): 1600-1606.
+
+UCAS Japan Investigators. The natural course of unruptured cerebral aneurysms in a Japanese cohort[J]. New England Journal of Medicine, 2012, 366(26): 2474-2482.
+
+Thompson B G, Brown Jr R D, Amin-Hanjani S, et al. Guidelines for the management of patients with unruptured intracranial aneurysms: a guideline for healthcare professionals from the American Heart Association/American Stroke Association[J]. Stroke, 2015, 46(8): 2368-2400.
+
+Ronneberger O, Fischer P, Brox T. U-net: Convolutional networks for biomedical image segmentation[C]//International Conference on Medical image computing and computer-assisted intervention. Cham: Springer international publishing, 2015: 234-241.
+
+Long J, Shelhamer E, Darrell T. Fully convolutional networks for semantic segmentation[C]//Proceedings of the IEEE conference on computer vision and pattern recognition. 2015: 3431-3440.
+
+Çiçek Ö, Abdulkadir A, Lienkamp S S, et al. 3D U-Net: learning dense volumetric segmentation from sparse annotation[C]//International conference on medical image computing and computer-assisted intervention. Cham: Springer International Publishing, 2016: 424-432.
+
+Milletari F, Navab N, Ahmadi S A. V-net: Fully convolutional neural networks for volumetric medical image segmentation[C]//2016 fourth international conference on 3D vision (3DV). Ieee, 2016: 565-571.
+
+Oktay O, Schlemper J, Folgoc L L, et al. Attention u-net: Learning where to look for the pancreas[J]. arXiv preprint arXiv:1804.03999, 2018.
+
+Isensee F, Jaeger P F, Kohl S A A, et al. nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation[J]. Nature methods, 2021, 18(2): 203-211.
+
+Kamnitsas K, Ledig C, Newcombe V F J, et al. Efficient multi-scale 3D CNN with fully connected CRF for accurate brain lesion segmentation[J]. Medical image analysis, 2017, 36: 61-78.
+
+
+
+
+
+Huang X, Khetan A, Cvitkovic M, et al. Tabtransformer: Tabular data modeling using contextual embeddings[J]. arXiv preprint arXiv:2012.06678, 2020.
+
+Gorishniy Y, Rubachev I, Khrulkov V, et al. Revisiting deep learning models for tabular data[J]. Advances in neural information processing systems, 2021, 34: 18932-18943.
+
+Vaswani A, Shazeer N, Parmar N, et al. Attention is all you need[J]. Advances in neural information processing systems, 2017, 30.
+
+Litjens G, Kooi T, Bejnordi B E, et al. A survey on deep learning in medical image analysis[J]. Medical image analysis, 2017, 42: 60-88.
+
+Shen D, Wu G, Suk H I. Deep learning in medical image analysis[J]. Annual review of biomedical engineering, 2017, 19: 221-248.
+
+Maier A, Syben C, Lasser T, et al. A gentle introduction to deep learning in medical image processing[J]. Zeitschrift für Medizinische Physik, 2019, 29(2): 86-101.
+
+Çiçek Ö, Abdulkadir A, Lienkamp S S, et al. 3D U-Net: learning dense volumetric segmentation from sparse annotation[C]//International conference on medical image computing and computer-assisted intervention. Cham: Springer International Publishing, 2016: 424-432.
+
+Zhou Z, Rahman Siddiquee M M, Tajbakhsh N, et al. Unet++: A nested u-net architecture for medical image segmentation[C]//International workshop on deep learning in medical image analysis. Cham: Springer International Publishing, 2018: 3-11.
+
+Sudre C H, Li W, Vercauteren T, et al. Generalised dice overlap as a deep learning loss function for highly unbalanced segmentations[C]//International Workshop on Deep Learning in Medical Image Analysis. Cham: Springer International Publishing, 2017: 240-248.
+
+Salehi S S M, Erdogmus D, Gholipour A. Tversky loss function for image segmentation using 3D fully convolutional deep networks[C]//International workshop on machine learning in medical imaging. Cham: Springer International Publishing, 2017: 379-387.
+
+Lin T Y, Goyal P, Girshick R, et al. Focal loss for dense object detection[C]//Proceedings of the IEEE international conference on computer vision. 2017: 2980-2988.
+
+Breiman L. Random forests[J]. Machine learning, 2001, 45(1): 5-32.
+
+Chen T, Guestrin C. Xgboost: A scalable tree boosting system[C]//Proceedings of the 22nd acm sigkdd international conference on knowledge discovery and data mining. 2016: 785-794.
+
+Hastie T, Tibshirani R, Friedman J. The elements of statistical learning[J]. 2009.
+
+Saito T, Rehmsmeier M. The precision-recall plot is more informative than the ROC plot when evaluating binary classifiers on imbalanced datasets[J]. PloS one, 2015, 10(3): e0118432.
+
+Guo C, Pleiss G, Sun Y, et al. On calibration of modern neural networks[C]//International conference on machine learning. PMLR, 2017: 1321-1330.
+
+Niculescu-Mizil A, Caruana R. Predicting good probabilities with supervised learning[C]//Proceedings of the 22nd international conference on Machine learning. 2005: 625-632.
+
+Chicco D, Jurman G. The advantages of the Matthews correlation coefficient (MCC) over F1 score and accuracy in binary classification evaluation[J]. BMC genomics, 2020, 21(1): 6.
+
+
+
+
+

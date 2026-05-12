@@ -132,6 +132,7 @@ async def segment_cta(
     segmentation_configuration = load_config(resolved_config_path)
 
     checkpoint_path_stripped = checkpoint_path.strip()
+    checkpoint_candidates: list[Path]
     if checkpoint_path_stripped:
         resolved_checkpoint_path = Path(checkpoint_path_stripped).expanduser()
         resolved_checkpoint_path = (
@@ -139,17 +140,26 @@ async def segment_cta(
             if resolved_checkpoint_path.is_absolute()
             else (APP_ROOT / resolved_checkpoint_path).resolve()
         )
+        checkpoint_candidates = [resolved_checkpoint_path]
     else:
-        resolved_checkpoint_path = (
-            APP_ROOT / Path(segmentation_configuration.checkpoint.save_dir) / "latest.pth"
-        ).resolve()
+        checkpoint_save_dir = (APP_ROOT / Path(segmentation_configuration.checkpoint.save_dir)).resolve()
+        checkpoint_candidates = [
+            checkpoint_save_dir / "latest.pth",
+            checkpoint_save_dir / "best.pth",
+            checkpoint_save_dir / "checkpoint.pth",
+        ]
+        resolved_checkpoint_path = next(
+            (candidate for candidate in checkpoint_candidates if candidate.is_file()),
+            checkpoint_candidates[0],
+        )
 
     if not resolved_checkpoint_path.is_file():
+        candidate_paths = ", ".join(str(candidate) for candidate in checkpoint_candidates)
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Checkpoint not found: {resolved_checkpoint_path}. "
-                "Send form field checkpoint_path, or train once so latest.pth exists under checkpoint.save_dir."
+                f"Checkpoint not found. Tried: {candidate_paths}. "
+                "Send form field checkpoint_path, or train once so a checkpoint exists under checkpoint.save_dir."
             ),
         )
     uploaded_cta_path = _save_upload(cta_file)

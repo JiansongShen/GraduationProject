@@ -5,18 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b6d86c24-f051-4fb3-bb99-92df58c09d10" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/doc/latex_paper/ref/ref_gbt7714" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_loss/Conv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_loss/LossMax.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_loss/MultiScaleWeightNet.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_loss/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/host.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/host.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/remote.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/remote.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/MedicalPatchDataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/MedicalPatchDataset.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.aux" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.aux" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.out" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.out" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.pdf" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.toc" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/LaTeX版本.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/abstract_cn.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/abstract_cn.tex" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/abstract_en.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/abstract_en.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter1_intro.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter1_intro.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter2_theory.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter2_theory.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter3_method.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter3_method.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter4_analysis.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter4_analysis.tex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/contents/chapter5_conclusion.tex" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/contents/chapter5_conclusion.tex" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/latex_paper/cquthesis.sty" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/cquthesis.sty" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/doc/latex_paper/ref/refs.bib" beforeDir="false" afterPath="$PROJECT_DIR$/doc/latex_paper/ref/refs.bib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,7 +37,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="453" />
+    <option name="cachedIndexableFilesCount" value="1582" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -53,49 +66,54 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.data_view.executor": "Run",
-    "Python.eval_split.executor": "Debug",
-    "Python.fastrad_test_py.executor": "Run",
-    "Python.main.executor": "Run",
-    "Python.pyradiomic_test.executor": "Run",
-    "Python.source_data_check.executor": "Run",
-    "Python.start_web.executor": "Run",
-    "Python.train_split.executor": "Debug",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "javascript.preferred.runtime.type.id": "node",
-    "last_opened_file_path": "/home/napbad/PycharmProjects/Gradulate",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.dev.executor": "Run",
-    "settings.editor.selected.configurable": "terminal",
-    "ts.external.directory.path": "/home/napbad/PycharmProjects/Gradulate/frontend/node_modules/typescript/lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.data_view.executor&quot;: &quot;Run&quot;,
+    &quot;Python.eval_split.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.fastrad_test_py.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pyradiomic_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.source_data_check.executor&quot;: &quot;Run&quot;,
+    &quot;Python.start_web.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_loss.executor&quot;: &quot;Run&quot;,
+    &quot;Python.train_split.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/napbad/PycharmProjects/Gradulate/test_loss/checkpoints/with_max_loss_conv_res_0-39&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/home/napbad/PycharmProjects/Gradulate/frontend/node_modules/typescript/lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/test_loss/checkpoints/with_max_loss_conv_res_0-39" />
+      <recent name="$PROJECT_DIR$/test_loss/checkpoints" />
       <recent name="$PROJECT_DIR$/config" />
       <recent name="$PROJECT_DIR$/model/aneurysm/model" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/test_loss/checkpoints/no_ml" />
       <recent name="$PROJECT_DIR$/ui" />
       <recent name="$PROJECT_DIR$/script" />
       <recent name="$PROJECT_DIR$/core" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.data_view">
+  <component name="RunManager" selected="Python.run_test">
     <configuration name="data_view" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="gradulate" />
       <option name="ENV_FILES" value="" />
@@ -113,31 +131,6 @@
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/temp/data_view.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="eval_split" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="gradulate" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/script" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="DEBUG_JUST_MY_CODE" value="false" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="RUN_TOOL" value="" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/script/eval_split.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -171,6 +164,31 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="run_test" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="gradulate" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test_loss" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test_loss/run_test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="source_data_check" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="gradulate" />
       <option name="ENV_FILES" value="" />
@@ -196,7 +214,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="train_split" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="test_loss" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="gradulate" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -205,15 +223,15 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/script" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test_loss" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="DEBUG_JUST_MY_CODE" value="false" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="RUN_TOOL" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/script/train_split.py" />
-      <option name="PARAMETERS" value="--config $PROJECT_DIR$/config/host.yaml" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test_loss/test_loss.py" />
+      <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -222,26 +240,25 @@
       <method v="2" />
     </configuration>
     <list>
+      <item itemvalue="Python.run_test" />
+      <item itemvalue="Python.test_loss" />
       <item itemvalue="Python.data_view" />
       <item itemvalue="Python.source_data_check" />
-      <item itemvalue="Python.eval_split" />
       <item itemvalue="Python.pyradiomic_test" />
-      <item itemvalue="Python.train_split" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.run_test" />
+        <item itemvalue="Python.test_loss" />
         <item itemvalue="Python.data_view" />
         <item itemvalue="Python.source_data_check" />
         <item itemvalue="Python.pyradiomic_test" />
-        <item itemvalue="Python.train_split" />
-        <item itemvalue="Python.eval_split" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-PY-261.23567.174" />
         <option value="bundled-python-sdk-024ed6589d45-c2ffad84badb-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-261.23567.174" />
       </set>
     </attachedChunks>
@@ -267,6 +284,10 @@
       <workItem from="1777722485868" duration="24746000" />
       <workItem from="1777928496458" duration="11779000" />
       <workItem from="1778001618020" duration="9351000" />
+      <workItem from="1778159504280" duration="18705000" />
+      <workItem from="1778179448015" duration="17693000" />
+      <workItem from="1778297180712" duration="28729000" />
+      <workItem from="1778556769752" duration="8000" />
     </task>
     <servers />
   </component>
@@ -274,8 +295,10 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/Gradulate$test_loss.coverage" NAME="test_loss Coverage Results" MODIFIED="1778161234799" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test_loss" />
     <SUITE FILE_PATH="coverage/Gradulate$fastrad_test_py.coverage" NAME="fastrad_test_py Coverage Results" MODIFIED="1777310978699" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temp" />
     <SUITE FILE_PATH="coverage/Gradulate$source_data_check.coverage" NAME="source_data_check Coverage Results" MODIFIED="1778047076217" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temp" />
+    <SUITE FILE_PATH="coverage/Gradulate$run_test.coverage" NAME="run_test Coverage Results" MODIFIED="1778222674412" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test_loss" />
     <SUITE FILE_PATH="coverage/Gradulate$data_view.coverage" NAME="data_view Coverage Results" MODIFIED="1778048420432" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temp" />
     <SUITE FILE_PATH="coverage/Gradulate$main.coverage" NAME="main Coverage Results" MODIFIED="1777366145299" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ui" />
     <SUITE FILE_PATH="coverage/Gradulate$start_web.coverage" NAME="start_web Coverage Results" MODIFIED="1777197181695" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/script" />
