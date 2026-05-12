@@ -109,7 +109,7 @@ def build_model(cfg: Config, device: torch.device) -> AttentionUnet:
 
 def main() -> None:
     args = parse_args()
-    logging.basicConfig(level=DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     config_path = Path(args.config)
     if not config_path.exists():

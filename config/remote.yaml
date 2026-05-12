@@ -16,7 +16,7 @@ train:
   batch_size: 1
   learning_rate: 1.0e-3
   weight_decay: 1.0e-5
-  patch_size: [32, 32, 32]
+  patch_size: [16, 16, 16]
   max_patches_per_volume: 64
   optimizer: "adam"
   scheduler: "cosine"
@@ -120,7 +120,7 @@ eval_every_n_epochs: 5
 overlap_inference:
   enabled: true
   # Overlapping patch inference for reduced boundary artifacts
-  patch_size: [32, 32, 32]    # Full patch size (should match training patch_size)
+  patch_size: [16, 16, 16]    # Full patch size (should match training patch_size)
   effective_size: [16, 16, 16]   # Center region kept for output; stride = effective_size
   # effective_size: [64, 64, 64] # Alternative: more overlap, more robust edges
   padding_mode: "reflect"        # Boundary padding: "reflect" (recommended), "constant"
