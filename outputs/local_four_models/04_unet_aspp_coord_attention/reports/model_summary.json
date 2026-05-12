@@ -1,0 +1,21 @@
+{
+  "experiment_key": "04_unet_aspp_coord_attention",
+  "display_name": "3D U-Net + ASPP + CoordAttention",
+  "description": "组合 ASPP 与三维坐标注意力，是本项目的增强分割模型。",
+  "use_aspp": true,
+  "use_coord_attention": true,
+  "parameter_count": 1830039,
+  "train_cases": 40,
+  "eval_cases": 1,
+  "epochs": 5,
+  "last_train_loss": 1.4766434239340829,
+  "best_sequential_mean_dice": 1.1542469564110341e-06,
+  "latest_sequential_mean_dice": 1.036735496135673e-06,
+  "latest_sequential_voxel_auc": 0.46713273996652216,
+  "latest_sequential_best_f1": 1.1080984712723756e-06,
+  "latest_foreground_only_mean_dice": 0.005131840705871582,
+  "checkpoint_latest": "outputs/local_four_models/04_unet_aspp_coord_attention/checkpoints/latest.pth",
+  "checkpoint_best": "outputs/local_four_models/04_unet_aspp_coord_attention/checkpoints/best.pth",
+  "log_dir": "outputs/local_four_models/04_unet_aspp_coord_attention/logs",
+  "report_dir": "outputs/local_four_models/04_unet_aspp_coord_attention/reports/eval_reports/2026-05-12/run_18-20-35"
+}

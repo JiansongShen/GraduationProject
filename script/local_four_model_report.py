@@ -33,7 +33,11 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+CWD_ROOT = Path.cwd().resolve()
+for candidate_root in (PROJECT_ROOT, CWD_ROOT):
+    candidate = str(candidate_root)
+    if candidate not in sys.path:
+        sys.path.insert(0, candidate)
 
 from core.config import Config  # noqa: E402
 from core.config_loader import load_config  # noqa: E402
@@ -84,7 +88,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=str, default="outputs/local_four_models", help="Output root")
     parser.add_argument("--device", type=str, default=None, help="Override device, e.g. cuda or cpu")
     parser.add_argument("--resume", action="store_true", help="Resume each model from latest.pth when available")
-    parser.add_argument("--skip-snapshots", action="store_true", help="Skip per-epoch first-case NIfTI snapshots")
+    parser.add_argument("--skip-snapshots", action="store_true", help="Skip per-eval first-case NIfTI snapshots")
+    parser.add_argument(
+        "--snapshot-case-index",
+        type=int,
+        default=0,
+        help="Validation case index used for per-eval NIfTI snapshots; keep the same index for visual comparison",
+    )
     parser.add_argument(
         "--experiments",
         nargs="+",
@@ -129,31 +139,38 @@ def prepare_eval_dataset(cfg: Config) -> MedicalPatchDataset:
 
 
 @torch.no_grad()
-def save_first_case_snapshot(
+def save_eval_case_snapshot(
     model: nn.Module,
     val_dataset: MedicalPatchDataset,
     device: torch.device,
     epoch: int,
     out_dir: Path,
     batch_size: int,
+    case_index: int = 0,
 ) -> None:
     if len(val_dataset) == 0:
+        logging.warning("Snapshot skipped: empty validation dataset")
         return
-    images, labels = val_dataset.get_patches(0, sampling_mode="sequential")
+    if case_index < 0 or case_index >= len(val_dataset):
+        logging.warning("Snapshot case index %d is out of range; validation cases=%d", case_index, len(val_dataset))
+        return
+
+    images, labels = val_dataset.get_patches(case_index, sampling_mode="sequential")
     if labels is None or int(images.shape[0]) == 0:
+        logging.warning("Snapshot skipped: case_index=%d has no sequential label patches", case_index)
         return
 
     was_training = model.training
     model.eval()
     try:
-        original_image = sitk.ReadImage(val_dataset.cases[0].image_path)
-        image_tensor, _ = val_dataset.get_src_item(0)
+        original_image = sitk.ReadImage(val_dataset.cases[case_index].image_path)
+        image_tensor, _ = val_dataset.get_src_item(case_index)
         patch_list: list[torch.Tensor] = []
         for patch_start in range(0, int(images.shape[0]), batch_size):
             batch_images = images[patch_start : patch_start + batch_size].to(device)
             outputs = model(batch_images)
             patch_list.extend([patch.detach().cpu() for patch in outputs[:, 0]])
-        _save_predictions(out_dir, epoch, val_dataset, 0, patch_list, image_tensor.shape, original_image)
+        _save_predictions(out_dir, epoch, val_dataset, case_index, patch_list, image_tensor.shape, original_image)
     finally:
         model.train(was_training)
 
@@ -201,6 +218,7 @@ def run_experiment(
     device_override: str | None,
     resume: bool,
     skip_snapshots: bool,
+    snapshot_case_index: int,
 ) -> dict[str, Any]:
     meta = EXPERIMENTS[experiment_key]
     cfg = copy.deepcopy(base_cfg)
@@ -233,6 +251,7 @@ def run_experiment(
     val_dataset = prepare_eval_dataset(cfg)
     writer = SummaryWriter(log_dir=str(log_dir / "tensorboard"))
     eval_report_dir = build_eval_report_dir(reports_dir, run_started_at=datetime.now())
+    eval_snapshot_dir = reports_dir / "eval_case_snapshots"
 
     start_epoch = 0
     best_score = 0.0
@@ -244,9 +263,6 @@ def run_experiment(
     latest_combined: dict[str, Any] | None = None
     last_train_loss = 0.0
     for epoch in range(start_epoch, cfg.train.epochs):
-        if not skip_snapshots:
-            save_first_case_snapshot(model, val_dataset, device, epoch, log_dir / "epoch_predictions_nifti", cfg.train.batch_size)
-
         last_train_loss = train_one_epoch(
             model,
             train_dataset,
@@ -305,6 +321,16 @@ def run_experiment(
             save_eval_report(eval_report_dir / "sequential", epoch, sequential_report)
             save_eval_report(eval_report_dir / "foreground_only", epoch, foreground_report)
             save_eval_report(eval_report_dir / "combined", epoch, latest_combined)
+            if not skip_snapshots:
+                save_eval_case_snapshot(
+                    model,
+                    val_dataset,
+                    device,
+                    epoch,
+                    eval_snapshot_dir,
+                    cfg.train.batch_size,
+                    case_index=snapshot_case_index,
+                )
             save_checkpoint(model, optimizer, epoch + 1, best_score, checkpoint_dir, is_best, scheduler=scheduler)
 
         if (epoch + 1) % cfg.checkpoint.save_interval == 0:
@@ -333,6 +359,8 @@ def run_experiment(
         "latest_foreground_only_mean_dice": _metric(latest_combined.get("foreground_only") if latest_combined else None, "mean_dice"),
         "checkpoint_latest": str(checkpoint_dir / "latest.pth"),
         "checkpoint_best": str(checkpoint_dir / "best.pth"),
+        "eval_snapshot_case_index": snapshot_case_index,
+        "eval_snapshot_dir": str(eval_snapshot_dir),
         "log_dir": str(log_dir),
         "report_dir": str(eval_report_dir),
     }
@@ -414,6 +442,7 @@ def write_final_reports(output_root: Path, config_path: Path, cfg: Config, summa
             "- `logs/training.log`：训练日志。",
             "- `logs/tensorboard/`：TensorBoard 曲线。",
             "- `reports/eval_reports/.../combined/latest.json`：该模型最新完整评估报告。",
+            "- `reports/eval_case_snapshots/`：每次 eval 后对同一个验证 CTA 病例保存的 NIfTI 概率图与二值分割图，可用于四模型可视化对比。",
             "- `reports/model_summary.json`：该模型摘要。",
             "",
             "总报告文件：",
@@ -447,6 +476,7 @@ def main() -> None:
                 args.device,
                 args.resume,
                 args.skip_snapshots,
+                args.snapshot_case_index,
             )
         )
 

@@ -1,0 +1,21 @@
+{
+  "experiment_key": "03_unet_coord_attention",
+  "display_name": "3D U-Net + CoordAttention",
+  "description": "在瓶颈层加入三维坐标注意力，强化空间方向敏感特征。",
+  "use_aspp": false,
+  "use_coord_attention": true,
+  "parameter_count": 1370775,
+  "train_cases": 40,
+  "eval_cases": 1,
+  "epochs": 5,
+  "last_train_loss": 1.3566620966771266,
+  "best_sequential_mean_dice": 1.3051129350758563e-06,
+  "latest_sequential_mean_dice": 1.0629374571520874e-06,
+  "latest_sequential_voxel_auc": 0.4710118586093306,
+  "latest_sequential_best_f1": 1.0853211292588917e-06,
+  "latest_foreground_only_mean_dice": 0.005261540412902832,
+  "checkpoint_latest": "outputs/local_four_models/03_unet_coord_attention/checkpoints/latest.pth",
+  "checkpoint_best": "outputs/local_four_models/03_unet_coord_attention/checkpoints/best.pth",
+  "log_dir": "outputs/local_four_models/03_unet_coord_attention/logs",
+  "report_dir": "outputs/local_four_models/03_unet_coord_attention/reports/eval_reports/2026-05-12/run_18-16-04"
+}

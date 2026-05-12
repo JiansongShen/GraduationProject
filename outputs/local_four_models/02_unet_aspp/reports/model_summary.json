@@ -1,0 +1,21 @@
+{
+  "experiment_key": "02_unet_aspp",
+  "display_name": "3D U-Net + ASPP",
+  "description": "在瓶颈层加入 ASPP，多尺度空洞卷积增强不同尺度动脉瘤区域表达。",
+  "use_aspp": true,
+  "use_coord_attention": false,
+  "parameter_count": 1825543,
+  "train_cases": 40,
+  "eval_cases": 1,
+  "epochs": 5,
+  "last_train_loss": 1.305374081318195,
+  "best_sequential_mean_dice": 1.3626705516468396e-06,
+  "latest_sequential_mean_dice": 1.1706954301005661e-06,
+  "latest_sequential_voxel_auc": 0.6953145250133506,
+  "latest_sequential_best_f1": 7.709431313785606e-06,
+  "latest_foreground_only_mean_dice": 0.005794942378997803,
+  "checkpoint_latest": "outputs/local_four_models/02_unet_aspp/checkpoints/latest.pth",
+  "checkpoint_best": "outputs/local_four_models/02_unet_aspp/checkpoints/best.pth",
+  "log_dir": "outputs/local_four_models/02_unet_aspp/logs",
+  "report_dir": "outputs/local_four_models/02_unet_aspp/reports/eval_reports/2026-05-12/run_18-11-37"
+}
