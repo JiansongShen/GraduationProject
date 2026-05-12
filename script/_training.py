@@ -238,13 +238,13 @@ def train_one_epoch(
             optimizer.zero_grad()
             outputs = model(batch_images)
             batch_labels = align_target_shape(outputs, batch_labels)
-            loss, _, _ = combined_loss_with_parts(outputs, batch_labels, **lk)
+            loss, bce_l, t_l = combined_loss_with_parts(outputs, batch_labels, **lk)
             loss.backward()
             optimizer.step()
 
             epoch_loss += loss.item()
             num_batches += 1
-            progress.set_postfix({"loss": f"{epoch_loss / max(num_batches, 1):.4f}"})
+            progress.set_postfix({"loss": f"{epoch_loss / max(num_batches, 1):.4f}, bce: {bce_l:.4f}, tver: {t_l:.4f}"})
 
             if num_batches % log_interval == 0:
                 writer.add_scalar("Loss/train_batch", loss.item(), epoch * len(dataset) + num_batches)
