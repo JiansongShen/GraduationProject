@@ -43,27 +43,27 @@
 \contentsline {subsection}{\numberline {4.2}实验环境及基本设置}{26}{subsection.4.2}%
 \contentsline {subsection}{\numberline {4.3}评价指标}{27}{subsection.4.3}%
 \contentsline {subsubsection}{\numberline {4.3.1}分割任务评价指标}{27}{subsubsection.4.3.1}%
-\contentsline {subsubsection}{\numberline {4.3.2}风险预测评价指标}{28}{subsubsection.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.3.2}风险预测评价指标}{29}{subsubsection.4.3.2}%
 \contentsline {subsection}{\numberline {4.4}动脉瘤分割实验}{29}{subsection.4.4}%
 \contentsline {subsubsection}{\numberline {4.4.1}实验目的与训练过程}{29}{subsubsection.4.4.1}%
 \contentsline {subsubsection}{\numberline {4.4.2}分割结果和阈值分析}{30}{subsubsection.4.4.2}%
-\contentsline {subsubsection}{\numberline {4.4.3}可视化分析与误差来源}{30}{subsubsection.4.4.3}%
-\contentsline {subsubsection}{\numberline {4.4.4}分割模型消融分析}{31}{subsubsection.4.4.4}%
-\contentsline {subsection}{\numberline {4.5}破裂风险预测实验}{32}{subsection.4.5}%
-\contentsline {subsubsection}{\numberline {4.5.1}实验目的与模型设置}{32}{subsubsection.4.5.1}%
-\contentsline {subsubsection}{\numberline {4.5.2}对比实验结果}{33}{subsubsection.4.5.2}%
-\contentsline {subsubsection}{\numberline {4.5.3}阈值选择与不平衡分类讨论}{34}{subsubsection.4.5.3}%
-\contentsline {subsubsection}{\numberline {4.5.4}风险模型结果讨论}{34}{subsubsection.4.5.4}%
-\contentsline {subsection}{\numberline {4.6}结果综合讨论}{35}{subsection.4.6}%
-\contentsline {subsection}{\numberline {4.7}系统展示}{36}{subsection.4.7}%
-\contentsline {subsection}{\numberline {4.8}本章小结}{37}{subsection.4.8}%
-\contentsline {section}{\numberline {5}总结与展望}{38}{section.5}%
-\contentsline {subsection}{\numberline {5.1}研究工作总结}{38}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}主要研究结论}{38}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}研究不足}{39}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}未来工作展望}{40}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}结束语}{41}{subsection.5.5}%
-\contentsline {section}{参考文献}{42}{subsection.5.5}%
-\contentsline {section}{附录A：关键配置与复现实验步骤}{45}{subsection.5.5}%
-\contentsline {section}{致谢}{47}{Item.16}%
-\contentsline {section}{原创性声明和使用授权书}{48}{Item.16}%
+\contentsline {subsubsection}{\numberline {4.4.3}可视化分析与误差来源}{31}{subsubsection.4.4.3}%
+\contentsline {subsubsection}{\numberline {4.4.4}分割模型消融分析}{33}{subsubsection.4.4.4}%
+\contentsline {subsection}{\numberline {4.5}破裂风险预测实验}{34}{subsection.4.5}%
+\contentsline {subsubsection}{\numberline {4.5.1}实验目的与模型设置}{34}{subsubsection.4.5.1}%
+\contentsline {subsubsection}{\numberline {4.5.2}对比实验结果}{36}{subsubsection.4.5.2}%
+\contentsline {subsubsection}{\numberline {4.5.3}阈值选择与不平衡分类讨论}{37}{subsubsection.4.5.3}%
+\contentsline {subsubsection}{\numberline {4.5.4}风险模型结果讨论}{37}{subsubsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.6}结果综合讨论}{38}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}系统展示}{38}{subsection.4.7}%
+\contentsline {subsection}{\numberline {4.8}本章小结}{38}{subsection.4.8}%
+\contentsline {section}{\numberline {5}总结与展望}{40}{section.5}%
+\contentsline {subsection}{\numberline {5.1}研究工作总结}{40}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}主要研究结论}{40}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}研究不足}{41}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}未来工作展望}{42}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}结束语}{43}{subsection.5.5}%
+\contentsline {section}{参考文献}{44}{subsection.5.5}%
+\contentsline {section}{附录A：关键配置与复现实验步骤}{47}{subsection.5.5}%
+\contentsline {section}{致谢}{49}{Item.16}%
+\contentsline {section}{原创性声明和使用授权书}{50}{Item.16}%

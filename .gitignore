@@ -117,4 +117,6 @@ temp
 uploads
 logs
 
+outputs
+*egg-info
 # doc
